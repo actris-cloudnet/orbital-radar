@@ -39,3 +39,9 @@ orbital-radar = "orbital_radar.__main__:main"
 
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
+
+[tool.mypy]
+check_untyped_defs = true
+
+[tool.ruff.lint]
+select = ["I"]
