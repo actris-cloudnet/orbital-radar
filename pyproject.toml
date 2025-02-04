@@ -32,7 +32,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "black", "pytest"]
+test = ["mypy", "pytest", "ruff"]
+dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "pre-commit"]
 
 [project.scripts]
 orbital-radar = "orbital_radar.__main__:main"
