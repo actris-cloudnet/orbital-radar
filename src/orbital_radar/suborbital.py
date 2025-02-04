@@ -1,31 +1,29 @@
 """
 This module contains the OrbitalRadar class that runs the simulator for
 suborbital radar data. It is a subclass of the Simulator class.
-
-Difference between ground-based and airborne radar geometry:
-- along-track coordinate from mean wind for ground based and mean flight vel.
-from airborne radar
-- no ground echo added to airborne radar
-- range grid of airborne radar assumed to be height above mean sea level and
-height above ground for groundbased
-- no attenuation correction for airborne radar
-- lat/lon coordinates included as input to airborne radar
 """
 
-import os
+import datetime
+import logging
+import uuid as uuidlib
+from dataclasses import dataclass
 
+import netCDF4
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from orbital_radar.helpers import db2li, li2db
-from orbital_radar.radarspec import RadarBeam
-from orbital_radar.readers.cloudnet import read_cloudnet
-from orbital_radar.readers.config import read_config
-from orbital_radar.readers.radar import Radar
+from orbital_radar.radar import Radar
 from orbital_radar.simulator import Simulator
-from orbital_radar.version import __version__
-from orbital_radar.writers.spaceview import write_spaceview
+
+
+@dataclass
+class SatelliteOptions:
+    height_min: float = -2500.0
+    height_max: float = 17500.0
+    height_res: float = 10.0
+    ground_echo_ze_max: float = 52.0
+    ground_echo_pulse_length: float = 100.0
 
 
 class Suborbital(Simulator):
@@ -33,356 +31,170 @@ class Suborbital(Simulator):
     Run the simulator for suborbital radar data.
     """
 
-    # list of all suborbital radar locations
-    names = {
-        "groundbased": [
-            "bco",
-            "jue",
-            "nor",
-            "mag",
-            "min",
-            "nya",
-            "arm",
-            "pamtra",
-        ],
-        "airborne": [
-            "mp5",
-            "rasta",
-        ],
-    }
-
     def __init__(
-        self, geometry, name, config_file, suborbital_radar, input_radar_format
+        self,
+        satellite_options: SatelliteOptions = SatelliteOptions(),
     ):
         """
         Initialize the simulator for suborbital radar data.
 
         Parameters
         ----------
-        geometry : str
-            Observation geometry of radar (groundbased or airborne).
-        name : str
-            Name of the suborbital radar (abbreviated).
-        config_file : str
-            Path to the configuration file that contains the site-dependent
-            parameters and directory paths.
-        suborbital_radar : str
-            Name of the suborbital radar (abbreviated).
-        input_radar_format : str
-            Format of the input radar data (e.g. cloudnet).
+        satellite_options : SatelliteOptions
+            Options for the satellite radar.
         """
 
-        # make sure that geometry is valid
-        if geometry not in self.names.keys():
-            raise ValueError(
-                f"Geometry {geometry} not implemented. Choose from "
-                f"{list(self.names.keys())}"
-            )
+        self.satellite_options = satellite_options
+        super().__init__()
 
-        # check if site is in list of implemented sites
-        if name not in self.names[geometry]:
-            raise ValueError(
-                f"Site {name} not implemented. Choose from "
-                f"{self.names[geometry]}"
-            )
+    def simulate_cloudnet(
+        self,
+        categorize_filepath: str,
+        output_filepath: str,
+        mean_wind: float,
+        uuid: str | None = None,
+    ) -> str:
+        """
+        Runs simulation for a single day.
 
-        # check if config file is provided and exists
-        if config_file is None:
-            raise ValueError("No configuration file provided")
+        Parameters
+        ----------
+        categorize_filepath : str
+            Path to Cloudnet categorize file.
+        output_filepath : str
+            Path to output file.
+        mean_wind : float
+            Mean wind speed in m/s.
+        uuid : str, optional
+            UUID of the file.
+        """
 
-        if not os.path.isfile(
-            os.path.join(os.environ["ORBITAL_RADAR_CONFIG_PATH"], config_file)
-        ):
-            raise FileNotFoundError(
-                f"Configuration file {config_file} not found"
-            )
+        radar = Radar(categorize_filepath)
 
-        # set class attributes
-        self.geometry = geometry
-        self.name = name
-        self.suborbital_radar = suborbital_radar
-        self.input_radar_format = input_radar_format
+        with xr.open_dataset(categorize_filepath) as ds_categorize:
+            frequency = ds_categorize.radar_frequency.item()
 
-        # attributes that will be derived
-        self.is_sea_level = False
+            if np.isclose(frequency, 35, atol=1):
+                radar.convert_frequency()
 
-        # read configuration file
-        self.config = read_config(config_file)
+            # TODO: Check this. Maybe you want to do
+            # this every time after frequency conversion?
+            elif np.isclose(frequency, 94, atol=1):
+                radar.correct_dielectric_constant(
+                    satellite_k2=0.75, radar_k2=0.86
+                )
+            else:
+                raise ValueError(f"Frequency {frequency} not supported")
 
-        # check if output path exists
-        assert os.path.exists(
-            self.config["paths"][self.name]["output"]
-        ), f"Output path {self.config['paths'][self.name]['output']} does not exist"
+            radar.create_along_track(mean_wind)
 
-        self.path_out = self.config["paths"][self.name]["output"]
-        self.frequency = self.config["suborbital_radar"][
-            self.suborbital_radar
-        ]["frequency"]
+            self._interpolate_to_regular_grid(radar.ds)
 
-        # preparation of input radar data
-        self.prepare = self.config["prepare"]["general"]
-        self.prepare.update(self.config["prepare"][self.geometry])
+            # TODO: Check this. Cloudnet categorize
+            # is already attenuation corrected?!
+            self._apply_gas_attenuation(ds_categorize)
 
-        # overview of simulation settings
-        self.summary
+        self._add_ground_echo()
 
-        # initialize simulator class with spaceborne radar settings
-        super().__init__(
-            sat_name=self.config["spaceborne_radar"]["sat_name"],
-            file_earthcare=self.config["spaceborne_radar"]["file_earthcare"],
-            nyquist_from_prf=self.config["spaceborne_radar"]["nyquist_from_prf"],
-            ms_threshold=self.config["spaceborne_radar"]["ms_threshold"],
-            ms_threshold_integral=self.config["spaceborne_radar"][
-                "ms_threshold_integral"
-            ],
-            **self.config["spaceborne_radar"]["radar_specs"],
+        # run simulator
+        self.transform()
+
+        self._remove_duplicate_times()
+
+        self._add_ground_based_variables(mean_wind)
+
+        self._to_netcdf(output_filepath)
+
+        file_uuid = self._harmonize_for_cloudnet(
+            output_filepath, categorize_filepath, uuid
         )
 
-    @property
-    def summary(self):
-        """
-        Prints short summary of simulator settings.
-        """
-
-        print(f"Site: {self.name}")
-        print("\n")
-
-        print("Directory paths:")
-        print(f"Input: {self.config['paths'][self.name]['radar']}")
-        print(f"Output: {self.config['paths'][self.name]['output']}")
-        print("\n")
-
-        if self.geometry == "groundbased":
-            print("Groundbased data is prepared with:")
-            print(f"Mean wind: {self.prepare['mean_wind']} m/s")
-
-        if self.geometry == "airborne":
-            print("Airborne data is prepared with:")
-            print(
-                f"Mean flight velocity: "
-                f"{self.prepare['mean_flight_velocity']} m/s"
-            )
-
-        print(f"Height min: {self.prepare['height_min']} m")
-        print(f"Height max: {self.prepare['height_max']} m")
-        print(f"Height res: {self.prepare['height_res']} m")
-        print("\n")
+        return file_uuid
 
     @staticmethod
-    def prepare_dates(start_date, end_date):
+    def _harmonize_for_cloudnet(
+        filepath: str, source_filepath: str, uuid: str | None
+    ) -> str:
+        with (
+            netCDF4.Dataset(filepath, "r+") as nc,
+            netCDF4.Dataset(source_filepath, "r") as nc_source,
+        ):
+            if uuid is None:
+                uuid = str(uuidlib.uuid4())
+            nc.file_uuid = uuid
+
+            # Format time units
+            time = nc.variables["time"]
+            time.units = time.units[:22] + " 00:00:00 +00:00"
+
+            # Add offset to along_track stuff to match Cloudnet timestamps
+            # TODO: there must be a way fix this earlier in the code
+            time = time[:]
+            n_hours_of_data = time[-1] - time[0]
+            for key in ("along_track", "along_track_sat"):
+                data = nc.variables[key][:]
+                distance_covered = data[-1] - data[0]
+                distance_per_hour = distance_covered / n_hours_of_data
+                offset = distance_per_hour * time[0]
+                nc.variables[key][:] += offset
+
+            # Convert linear units to dB
+            for var in ("ze_sat", "ze_sat_noise", "ze"):
+                nc.variables[var][:] = li2db(nc.variables[var][:])
+                nc.variables[var].units = "dBZ"
+
+            # Change velocity direction to match Cloudnet
+            for var in ("vm_sat", "vm_sat_noise", "vm_sat_folded"):
+                nc.variables[var][:] *= -1
+
+            # Remove unnecessary global attributes
+            for attr in (
+                "cloudnetpy_version",
+                "pid",
+            ):
+                if attr in nc.ncattrs():
+                    nc.delncattr(attr)
+
+            file_type = "cpr-simulation"
+            nc.cloudnet_file_type = file_type
+            nc.location = nc_source.location
+            nc.title = f"Simulated CPR radar from {nc_source.location}"
+            nc.source = nc_source.variables["Z"].source
+            nc.source_file_uuids = nc_source.file_uuid
+            now = f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S +00:00}"
+            nc.history = f"{now} - {file_type} file created\n" + nc.history
+            nc.references = "https://doi.org/10.5194/gmd-18-101-2025"
+
+        return uuid
+
+    def _interpolate_to_regular_grid(self, radar_ds: xr.Dataset) -> None:
         """
-        Creates a date array from start to end date.
+        Interpolates radar data to regular grid in along-track and height.
 
         Parameters
         ----------
-        start_date : np.datetime64
-            Start date.
-        end_date : np.datetime64
-            End date.
-
-        Returns
-        -------
-        dates: pd.DatetimeIndex
-            Date range from start to end date.
-        """
-
-        # check if start date is before end date
-        if start_date > end_date:
-            raise ValueError("Start date must be before end date")
-
-        dates = pd.date_range(start_date, end_date)
-
-        return dates
-
-    def convert_frequency(self, ds):
-        """
-        Convert frequency from 35 to 94 GHz.
-
-        The conversion is based on Kollias et al. (2019)
-        (doi: https://doi.org/10.5194/amt-12-4949-2019)
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "ze" variable in mm6/mm3. Ze was measured at 35 GHz.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with converted "ze" variable. Ze is now transformed to 94 GHz.
-        """
-
-        # keep only reflectivities below 30 dBZ
-        ds["ze"] = ds["ze"].where(ds["ze"] < db2li(30))
-
-        a = -16.8251
-        b = 8.4923
-        ds["ze"] = db2li(
-            li2db(ds["ze"]) - 10**a * (li2db(ds["ze"]) + 100) ** b
-        )
-
-        # set negative ze to zero
-        ds["ze"] = ds["ze"].where(ds["ze"] > 0.0, 0.0)
-
-        return ds
-
-    def correct_dielectric_constant(self, ds):
-        r"""
-        Apply correction for dielectric constant assumed in Ze calculation
-        of suborbital radar to match the dielectric constant of the
-        spaceborne radar.
-
-        Correction equation with :math:`K_g` and :math:`K_s` as dielectric
-        constants of the suborbital and spaceborne radar, respectively:
-
-        .. math::
-           Z_e = 10 \log_{10} \left( \frac{K_s}{K_g} \right) + Z_e
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "ze" variable.
-        """
-
-        correction = (
-            self.config["spaceborne_radar"]["k2"]
-            / self.config["suborbital_radar"][self.suborbital_radar]["k2"]
-        )
-
-        ds["ze"] = db2li(li2db(ds["ze"]) + 10 * np.log10(correction))
-
-        return ds
-
-    def add_vmze_attrs(self, ds):
-        """
-        Adds attributes to Doppler velocity and radar reflectivity variables.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "ze" and "vm" variables.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with added attributes.
-        """
-
-        ds["ze"].attrs = dict(
-            units="mm6 m-3",
-            standard_name="radar_reflectivity",
-            long_name="Radar reflectivity",
-            description="Radar reflectivity",
-        )
-
-        ds["vm"].attrs = dict(
-            units="m s-1",
-            standard_name="Doppler_velocity",
-            long_name="Doppler velocity",
-            description="Doppler velocity",
-        )
-
-        return ds
-
-    def check_is_sea_level(self, ds):
-        """
-        Check if input radar range/height grid is defined with respect to
-        ground level or sea level. The input to the simulator should be wrt.
-        sea level.
-
-        Parameters
-        ----------
-        ds : xr.Dataset
-            Input radar data
-        """
-
-        if "height" in list(ds.coords.keys()):
-            self.is_sea_level = True
-        
-        else:
-            self.is_sea_level = False
-
-    def range_to_height(self, ds):
-        """
-        Convert range coordinate to height coordinate by adding the station
-        height above mean sea level to the range coordinate.
-
-        The altitude is pre-defined for each station in the configuration file.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "range" coordinate.
-        """
-
-        ds["height"] = ds["range"] + ds.alt.item()
-
-        # swap range with height
-        ds = ds.swap_dims({"range": "height"})
-
-        # drop range coordinate
-        ds = ds.reset_coords(drop=True)
-
-        return ds
-
-    def create_along_track(self, ds):
-        """
-        Creates along-track coordinates from time coordinates.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
+        radar_ds : xarray.Dataset
             Data with "time" and "height" coordinates.
 
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with "along_track" coordinate.
         """
 
-        if self.geometry == "groundbased":
-            print("Using mean wind for along-track coordinates")
-            v = self.prepare["mean_wind"]
+        regular_height = self._create_regular_height()
+        regular_along_track = self._create_regular_along_track(radar_ds)
 
-        elif self.geometry == "airborne" and "ac_speed" in list(ds):
-            print("Using flight velocity for along-track coordinates")
-            v = ds.ac_speed.values
-
-        elif self.geometry == "airborne" and "ac_speed" not in list(ds):
-            print("Using mean flight velocity for along-track coordinates")
-            v = self.prepare["mean_flight_velocity"]
-
-        else:
-            raise ValueError(
-                f"Geometry {self.geometry} not implemented. Choose from "
-                f"{list(self.names.keys())}"
-            )
-
-        # calculate the along-track distance
-        dt = ds.time.diff("time") / np.timedelta64(1, "s")
-        dt = xr.align(ds.time, dt, join="outer")[1].fillna(0)  # start is dt=0
-        arr_along_track = np.cumsum(v * dt)
-
-        da_along_track = xr.DataArray(
-            arr_along_track, dims="time", coords=[ds.time], name="along_track"
+        self.ds = radar_ds.interp(
+            along_track=regular_along_track,
+            height=regular_height,
+            method="nearest",
         )
-        da_along_track.attrs = dict(
-            standard_name="along_track_distance",
-            long_name="Along track distance",
-            units="m",
-            description="Distance along track of the suborbital radar",
+        # get nearest time for each regular along track grid point
+        self.ds.coords["time"] = (
+            ("along_track"),
+            radar_ds["time"]
+            .sel(along_track=self.ds.along_track, method="nearest")
+            .values,
         )
 
-        # swap from time to along track
-        ds = ds.assign_coords(along_track=da_along_track)
-        ds = ds.swap_dims({"time": "along_track"})
-
-        # add time as variable
-        ds = ds.reset_coords()
-
-        return ds
-
-    def create_regular_height(self):
+    def _create_regular_height(self) -> xr.DataArray:
         """
         Creates regular height coordinate for suborbital radar.
 
@@ -392,25 +204,18 @@ class Suborbital(Simulator):
             Regular height coordinate for suborbital radar.
         """
 
-        height_regular = np.arange(
-            self.prepare["height_min"],
-            self.prepare["height_max"],
-            self.prepare["height_res"],
+        regular_height = np.arange(
+            self.satellite_options.height_min,
+            self.satellite_options.height_max,
+            self.satellite_options.height_res,
         )
 
-        da_height_regular = xr.DataArray(
-            height_regular, dims="height", coords=[height_regular]
-        )
-        da_height_regular.attrs = dict(
-            units="m",
-            standard_name="height",
-            long_name="Height of radar bin above sea level",
-            description="Height of radar bin above sea level",
+        return xr.DataArray(
+            regular_height, dims="height", coords=[regular_height]
         )
 
-        return da_height_regular
-
-    def create_regular_along_track(self, ds):
+    @staticmethod
+    def _create_regular_along_track(ds: xr.Dataset) -> xr.DataArray:
         """
         Creates regular along-track coordinate for suborbital radar.
 
@@ -436,54 +241,13 @@ class Suborbital(Simulator):
             along_track_res,
         )
 
-        da_along_track_regular = xr.DataArray(
+        return xr.DataArray(
             along_track_regular,
             dims="along_track",
             coords=[along_track_regular],
         )
-        da_along_track_regular.attrs = ds.along_track.attrs
 
-        return da_along_track_regular
-
-    def interpolate_to_regular_grid(self, ds):
-        """
-        Interpolates radar data to regular grid in along-track and height.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "time" and "height" coordinates.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with interpolated "along_track" and "height" coordinates.
-        """
-
-        da_height_regular = self.create_regular_height()
-        da_along_track_regular = self.create_regular_along_track(ds=ds)
-
-        # interpolation along-track and height
-        # workaround for time: convert to seconds since start, then
-        # interpolate, then convert back to datetime
-        da_time = ds["time"]
-        ds = ds.interp(
-            along_track=da_along_track_regular,
-            height=da_height_regular,
-            method="nearest",
-        )
-        # get nearest time for each regular along track grid point
-        ds.coords["time"] = (
-            ("along_track"),
-            da_time.sel(along_track=ds.along_track, method="nearest").values,
-        )
-
-        # add attributes
-        ds = self.add_vmze_attrs(ds)
-
-        return ds
-
-    def add_ground_echo(self, ds):
+    def _add_ground_echo(self) -> None:
         """
         Calculates artificial ground echo inside ground-based radar range
         grid. The values are chosen such that the final ground echo after
@@ -491,43 +255,37 @@ class Suborbital(Simulator):
         satellite. The pulse length used here is not the same as the pulse
         length of the satellite.
 
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "ze" and "vm" variables.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with added ground echo.
         """
 
-        assert len(np.unique(np.diff(ds.height))) == 1, (
+        assert len(np.unique(np.diff(self.ds.height))) == 1, (
             "Height grid is not equidistant. "
             "Range weighting function cannot be calculated."
         )
 
         # grid with size of two pulse lengths centered around zero
         height_bins = np.arange(
-            -self.prepare["ground_echo_pulse_length"],
-            self.prepare["ground_echo_pulse_length"]
-            + self.prepare["height_res"],
-            self.prepare["height_res"],
+            -self.satellite_options.ground_echo_pulse_length,
+            self.satellite_options.ground_echo_pulse_length
+            + self.satellite_options.height_res,
+            self.satellite_options.height_res,
         )
 
-        # calculate range weighting function
-        weights = RadarBeam.normalized_range_weighting_function_default(
-            pulse_length=self.prepare["ground_echo_pulse_length"],
+        # calculate DEFAULT range weighting function
+        # should this be EarthCARE CPR weighting function?
+        weights = self._normalized_range_weighting_function_default(
+            pulse_length=self.satellite_options.ground_echo_pulse_length,
             range_bins=height_bins,
         )
 
-        ground_echo = weights * db2li(self.prepare["ground_echo_ze_max"])
+        ground_echo = weights * db2li(
+            self.satellite_options.ground_echo_ze_max
+        )
 
         # add ground echo to dataset shifted by one height bin to have maximum
         # below zero
         # get closest height bin to ground
-        idx = (np.abs(ds.height - ds.alt.item())).argmin()
-        base = ds.height[idx].item()
+        idx = (np.abs(self.ds.height - self.ds.altitude.item())).argmin()
+        base = self.ds.height[idx].item()
 
         # insert half of the calculated ground echo and shift maximum below the
         # surface
@@ -535,337 +293,122 @@ class Suborbital(Simulator):
         height_bins = (
             base
             + height_bins[int(len(height_bins) / 2) :]
-            - self.prepare["height_res"]
+            - self.satellite_options.height_res
         )
 
         # add ground echo to dataset (first fill nan values with zero in this
         # height interval)
-        ds["ze"].loc[{"height": height_bins}] = (
-            ds["ze"].loc[{"height": height_bins}].fillna(0)
+        self.ds["ze"].loc[{"height": height_bins}] = (
+            self.ds["ze"].loc[{"height": height_bins}].fillna(0)
         )
-        ds["ze"].loc[{"height": height_bins}] += ground_echo
+        self.ds["ze"].loc[{"height": height_bins}] += ground_echo
 
-        return ds
-
-    def add_groundbased_variables(self):
+    @staticmethod
+    def _normalized_range_weighting_function_default(
+        pulse_length: float, range_bins: np.ndarray
+    ) -> np.ndarray:
         """
-        Add variables specific to groundbased simulator to the dataset, i.e.,
-        the mean horizontal wind.
+        Defines the range weighting function for the along-range averaging.
         """
+        # calculate along-range weighting function
+        w_const = -(np.pi**2) / (2.0 * np.log(2) * pulse_length**2)
+        range_weights = np.exp(w_const * range_bins**2)
+        return range_weights / np.sum(range_weights)
 
+    def _add_ground_based_variables(self, mean_wind: float) -> None:
         self.ds["mean_wind"] = xr.DataArray(
-            self.prepare["mean_wind"],
-            attrs=dict(
-                standard_name="v_hor",
-                long_name="Mean horizontal wind",
-                units="m s-1",
-                description="Mean horizontal wind",
-            ),
+            mean_wind,
+            attrs={
+                "long_name": "Mean horizontal wind",
+                "units": "m s-1",
+                "description": "Mean horizontal wind",
+            },
         )
 
-    def add_airborne_variables(self):
-        """
-        Add variables specific to airborne simulator to the dataset, i.e.,
-        the mean flight velocity.
-        """
-
-        self.ds["mean_flight_velocity"] = xr.DataArray(
-            self.prepare["mean_flight_velocity"],
-            attrs=dict(
-                standard_name="v_hor",
-                long_name="Mean flight velocity",
-                units="m s-1",
-                description="Mean flight velocity",
-            ),
-        )
-
-    def to_netcdf(self, date):
+    def _to_netcdf(self, output_filepath: str) -> None:
         """
         Writes dataset to netcdf file. Note that not all variables are stored.
 
         Parameters
         ----------
-        date : np.datetime64
-            Date of the simulation. Used to create the filename.
+        output_filepath : str
+            Path to the output file.
+
         """
 
-        output_variables = [
-            "sat_ifov",
-            "sat_range_resolution",
-            "sat_along_track_resolution",
-            "ze",
-            "vm",
-            "ze_sat",
-            "vm_sat",
-            "vm_sat_vel",
-            "ze_sat_noise",
-            "vm_sat_noise",
-            "vm_sat_folded",
-            "nubf_flag",
-            "ms_flag",
-            "folding_flag",
-        ]
+        date = self.ds.time[0].dt.strftime("%Y-%m-%d").item()
 
-        if self.geometry == "groundbased":
-            output_variables += ["mean_wind"]
+        TIME = {
+            "dtype": "float64",
+            "_FillValue": None,
+            "units": f"hours since {date} 00:00:00 +00:00",
+        }
+        FLOAT = {
+            "dtype": "float32",
+            "_FillValue": netCDF4.default_fillvals["f4"],
+        }
+        INT = {"dtype": "int32", "_FillValue": netCDF4.default_fillvals["i4"]}
+        FLOAT_SCALAR = {"dtype": "float32", "_FillValue": None}
 
-        if self.geometry == "airborne":
-            output_variables += ["mean_flight_velocity"]
+        variable_map = {
+            "time": TIME,
+            "sat_ifov": FLOAT_SCALAR,
+            "sat_range_resolution": FLOAT_SCALAR,
+            "sat_along_track_resolution": FLOAT_SCALAR,
+            "ze": FLOAT,
+            "vm": FLOAT,
+            "ze_sat": FLOAT,
+            "vm_sat": FLOAT,
+            "vm_sat_vel": FLOAT,
+            "ze_sat_noise": FLOAT,
+            "vm_sat_noise": FLOAT,
+            "vm_sat_folded": FLOAT,
+            "nubf_flag": INT,
+            "ms_flag": INT,
+            "folding_flag": INT,
+            "mean_wind": FLOAT_SCALAR,
+            "latitude": FLOAT_SCALAR,
+            "longitude": FLOAT_SCALAR,
+            "altitude": FLOAT_SCALAR,
+            "along_track": FLOAT,
+            "height_sat": FLOAT_SCALAR,
+            "along_track_sat": FLOAT,
+            "height": FLOAT,
+        }
 
-        # name of output nc file
-        filename = (
-            "_".join(
-                [
-                    "ora",
-                    __version__,
-                    self.config["spaceborne_radar"]["sat_name"],
-                    "l1",
-                    self.geometry,
-                    self.name,
-                    self.suborbital_radar,
-                    pd.Timestamp(date).strftime("%Y%m%d") + "T000000",
-                    pd.Timestamp(date).strftime("%Y%m%d") + "T235959",
-                ]
-            )
-            + ".nc"
+        self.ds[variable_map.keys()].to_netcdf(  # type: ignore
+            output_filepath,
+            mode="w",
+            encoding=variable_map,
+            format="NETCDF4_CLASSIC",
         )
+        logging.debug(f"Written file: {output_filepath}")
 
-        filename = os.path.join(
-            self.path_out,
-            filename,
-        )
-
-        write_spaceview(ds=self.ds[output_variables], filename=filename)
-
-    def add_attenuation(self, ds, da_gas_atten):
+    def _apply_gas_attenuation(self, ds_categorize: xr.Dataset) -> None:
         """
-        Add attenuation to dataset.
+        Gas attenuation correction based on Cloudnet categorize file.
 
         Parameters
         ----------
-        ds : xarray.Dataset
-            Data with "ze" variable. Unit: mm6 m-3
-        da_gas_atten : xarray.DataArray
-            Interpolated gas attenuation data on the same grid as ds.
-            Unit: dBZ.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with added attenuation.
-        """
-
-        # add attenuation in dB and convert back to
-        ds["ze"] = db2li(li2db(ds["ze"]) + da_gas_atten)
-
-        return ds
-
-    def attenuation_correction(self, ds, ds_cloudnet):
-        """
-        Gas attenuation correction based on Cloudnet.
-
-        Cloudnet contains gas attenuation (gas_atten) as a function of 137
-        ERA5 levels. The height of each level varies with time. Therefore,
-        the height is first interpolated onto the height grid of the radar
-        data. Then, the gas attenuation is interpolated onto the time and
-        height grid of the radar data. Finally, the gas attenuation is added
-        to the radar reflectivity.
-
-        There are major differences between the cloudnet_ecmwf and
-        cloudnet_categorize attenuation products:
-        - ecmwf height is time-dependent, categorize height is not
-        - ecmwf height is wrt ground, categorize height is wrt mean sea level
-        - ecmwf variable is named "radar_gas_atten", categorize variable is
-        named "gas_atten"
-        - ecmwf is calculated for both frequencies, categorize only for 94 GHz
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "ze" variable. Unit: mm6 m-3
-        ds_cloudnet : xarray.Dataset
+        ds_categorize : xarray.Dataset
             Cloudnet data with "gas_atten" variable. Unit: dBZ
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with added attenuation.
         """
 
-        # select 94 GHz frequency
-        if "frequency" in list(ds_cloudnet.dims):
-            ds_cloudnet = ds_cloudnet.sel(frequency=94, method="nearest")
-
-        if self.prepare["attenuation_correction_input"] == "cloudnet_ecmwf":
-            lst_da_gas_atten = []
-            for time in ds_cloudnet.time:
-
-                # interpolate gas attenuation to radar height grid
-                ds_cloudnet_t = ds_cloudnet.sel(time=time).swap_dims(
-                    {"level": "height"}
-                )
-
-                da_cloudnet_gas_atten_t = ds_cloudnet_t.gas_atten.interp(
-                    height=ds.height, method="linear"
-                )
-
-                lst_da_gas_atten.append(da_cloudnet_gas_atten_t)
-
-            # merge all time steps
-            da_gas_atten = xr.concat(lst_da_gas_atten, dim="time")
-
-            # drop levels
-            da_gas_atten = da_gas_atten.reset_coords(drop=True)
-
-        elif (
-            self.prepare["attenuation_correction_input"]
-            == "cloudnet_categorize"
-        ):
-            # rename to match ecmwf variable
-            ds_cloudnet = ds_cloudnet.rename({"radar_gas_atten": "gas_atten"})
-
-            # interpolate to radar height grid
-            da_gas_atten = ds_cloudnet.gas_atten.interp(
-                height=ds.height, method="linear"
-            )
-
-        else:
-            raise ValueError(
-                f"Attenuation correction input "
-                f"{self.prepare['attenuation_correction_input']} not "
-                f"implemented"
-            )
+        # interpolate to radar height grid
+        gas_atten = ds_categorize.radar_gas_atten.interp(
+            height=self.ds.height, method="linear"
+        )
 
         # interpolate to radar time grid and extrapolate if needed
-        da_gas_atten = da_gas_atten.interp(
-            time=ds.time, method="linear", kwargs={"fill_value": "extrapolate"}
+        gas_atten = gas_atten.interp(
+            time=self.ds.time,
+            method="linear",
+            kwargs={"fill_value": "extrapolate"},
         )
-
-        # ensures every time step contains attenuation in range column
-        has_atten = ~da_gas_atten.isnull().all("height")
-        assert (
-            has_atten.all()
-        ), f"Attenuation missing for times: {da_gas_atten.time[~has_atten]}"
-
-        # fill nan values with zero
-        da_gas_atten = da_gas_atten.fillna(0)
 
         # apply attenuation correction
-        ds = self.add_attenuation(ds=ds, da_gas_atten=da_gas_atten)
+        self.ds["ze"] *= db2li(gas_atten)
 
-        return ds
-
-    def run_date(self, date, write_output=True):
-        """
-        Runs simulation for a single day.
-
-        Parameters
-        ----------
-        date : np.datetime64
-            Date to simulate.
-        write_output : bool
-            If True, write output to netcdf file.
-        """
-
-        # read radar data
-        if self.input_radar_format == "cloudnet":
-            radar_path = self.config["paths"][self.name]["cloudnet"]
-        else:
-            radar_path = self.config["paths"][self.name]["radar"]
-
-        rad = Radar(
-            date=date,
-            site_name=self.name,
-            path=radar_path,
-            input_radar_format=self.input_radar_format,
-        )
-
-        # skip if radar data does not exist
-        if rad.ds_rad is None:
-            print(f"{date}: No radar data found")
-            return
-
-        # read cloudnet data
-        if self.geometry == "groundbased":
-            ds_cloudnet = read_cloudnet(
-                attenuation_correction_input=self.prepare[
-                    "attenuation_correction_input"
-                ],
-                date=date,
-                site_name=self.name,
-                path=self.config["paths"][self.name]["cloudnet"],
-            )
-
-            if ds_cloudnet is None:
-                self.prepare["attenuation_correction"] = False
-
-        # frequency conversion
-        if self.frequency == 35:
-            rad.ds_rad = self.convert_frequency(rad.ds_rad)
-
-        # correct dielectric constant
-        if self.frequency == 94:
-            rad.ds_rad = self.correct_dielectric_constant(rad.ds_rad)
-
-        # range to height
-        self.check_is_sea_level(rad.ds_rad)
-
-        if (self.geometry == "groundbased") and not self.is_sea_level:
-            print("Converting radar range grid to height above mean sea level")
-            rad.ds_rad = self.range_to_height(rad.ds_rad)
-        else:
-            print(
-                "Assume that input radar grid is defined as height above mean "
-                "sea level"
-            )
-
-        # create along track dimension
-        rad.ds_rad = self.create_along_track(ds=rad.ds_rad)
-
-        # interpolate to regular grid
-        ds = self.interpolate_to_regular_grid(rad.ds_rad)
-
-        if self.geometry == "groundbased":
-            # attenuation correction
-            # no attenuation correction with 35 GHz radar reflectivity
-            if self.frequency == 35:
-                self.prepare["attenuation_correction"] = False
-
-            if self.prepare["attenuation_correction"]:
-                ds = self.attenuation_correction(ds, ds_cloudnet)
-
-            # add ground echo
-            ds = self.add_ground_echo(ds)
-
-        # run simulator
-        self.transform(ds)
-
-        # add horizontal wind variable
-        if self.geometry == "groundbased":
-            self.add_groundbased_variables()
-
-        if self.geometry == "airborne":
-            self.add_airborne_variables()
-
-        # write output to file
-        if write_output:
-            self.to_netcdf(date=date)
-
-    def run(self, start_date, end_date, write_output=True):
-        """
-        Runs simulation for all days in the time frame.
-
-        Parameters
-        ----------
-        start_date : np.datetime64
-            Start date.
-        end_date : np.datetime64
-            End date (inclusive).
-        """
-
-        dates = self.prepare_dates(start_date, end_date)
-
-        for i, date in enumerate(dates):
-            print(f"Processing {date} ({i+1}/{len(dates)})")
-
-            self.run_date(date, write_output=write_output)
+    def _remove_duplicate_times(self) -> None:
+        _, index = np.unique(self.ds["time"], return_index=True)
+        self.ds = self.ds.isel(along_track=index)

@@ -1,3 +1,1 @@
-import importlib.metadata
-
-__version__ = importlib.metadata.version("orbital_radar")
+__version__ = "0.0.1"
