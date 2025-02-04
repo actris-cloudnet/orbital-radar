@@ -27,14 +27,13 @@ dependencies = [
   "numpy >= 1.25.0",
   "pandas >= 2.0.0",
   "pytest >= 7.4.0",
-  "python-dotenv == 1.0.0",
   "scipy >= 1.10.0",
   "toml >= 0.10.2",
   "xarray >= 2023.01.0",
 ]
 
 [project.optional-dependencies]
-dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "tox", "black"]
+dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "black"]
 
 [project.scripts]
 orbital-radar = "orbital_radar.__main__:main"
