@@ -1,9 +1,9 @@
 """
-This script contains all reader functions for the different radar formats. 
+This script contains all reader functions for the different radar formats.
 These functions are wrapped by the main function, which picks the correct
 reader depending on the radar site.
 
-The final output is always an xarray.Dataset with the two variables radar 
+The final output is always an xarray.Dataset with the two variables radar
 reflectivity "ze" in [mm6 m-3] and "vm" in [m s-1] as a function of range and
 time.
 
@@ -15,11 +15,11 @@ match spaceborne convention.
 import os
 import os.path
 from glob import glob
-from scipy.interpolate import interp1d
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+from scipy.interpolate import interp1d
 
 from orbital_radar.readers.cloudnet import read_cloudnet
 
@@ -363,7 +363,7 @@ class Radar:
         self.convert_and_sort_time(base_time="2001-01-01")
 
         # convert from dB to linear units
-        self.ds_rad["ze"] = 10 ** (0.1 * self.ds_rad["ze"])  
+        self.ds_rad["ze"] = 10 ** (0.1 * self.ds_rad["ze"])
 
     def read_uoc_v1(self):
         """
@@ -629,7 +629,9 @@ class Radar:
         files = self.get_all_files(f'*{self.date.strftime(r"%Y%m%d")}*v1.nc')
 
         if len(files) == 0:
-            files = self.get_all_files(f'*{self.date.strftime(r"%Y%m%d")}*v0.nc')
+            files = self.get_all_files(
+                f'*{self.date.strftime(r"%Y%m%d")}*v0.nc'
+            )
 
         if len(files) == 0:
             return None
@@ -817,7 +819,6 @@ class Radar:
             ze_height = np.zeros((len(ds["time"]), len(ds["height"])))
             vm_height = np.zeros((len(ds["time"]), len(ds["height"])))
             for i in range(len(ds.time)):
-
                 # interpolate ze in linear space
                 f_ze = interp1d(
                     ds["height_2D"].isel(time=i).values * 1e3,

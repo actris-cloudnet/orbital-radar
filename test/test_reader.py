@@ -3,7 +3,7 @@ Test radar reader functions for different formats. This test requires local
 example data for each reader function for the tested site and date.
 
 The test requires that all paths are specified in orbital_radar_config.toml
-with the environment variable ``ORBITAL_RADAR_CONFIG_PATH`` pointing to the 
+with the environment variable ``ORBITAL_RADAR_CONFIG_PATH`` pointing to the
 config file.
 """
 

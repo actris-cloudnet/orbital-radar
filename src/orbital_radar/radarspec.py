@@ -1,6 +1,6 @@
 """
 This module contains the satellite class and functions to calculate the
-along-track and along-range averaging parameters. Main methode and  
+along-track and along-range averaging parameters. Main method and
 definitions based on Lamer et al (2020) and Schirmacher et al. (2023).
 
 Two pre-defined satellites are available: EarthCARE and CloudSat.
@@ -39,7 +39,7 @@ Two pre-defined satellites are available: EarthCARE and CloudSat.
 - ifov_scale:                       Tanelli et al. (2008), "integration accurecy of the pulse is 0.968 s"
 - detection limit:                  Kollias et al. (2014), Table 1
 - pules repetition frequency (PRF): Kollias et al. (2014, 2022), Table 1
-- noise_ze:                         
+- noise_ze:
 - ze_bins:                          Hogan et al. (2005),
 - ze_std:                           Hogan et al. (2005),
 - ze_std_background:
@@ -59,7 +59,7 @@ Tanelli et al. (2008)     : https://doi.org/10.1109/TGRS.2008.2002030
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import numpy as np
 
@@ -85,7 +85,7 @@ RADARS_PREDEFINED = {
         "noise_ze": -21.5,
         "ze_bins": [-37, -25, -13],
         "ze_std": [0.5, 0.3, 0.2],
-        "ze_std_background": 0.4252, #0.2176,
+        "ze_std_background": 0.4252,  # 0.2176,
         "vm_bins_broad": [
             -37,
             -34,
@@ -396,8 +396,10 @@ class RadarBeam:
             self.calculate_nyquist_velocity()
 
         else:
-            print("Nyquist velocity parameter is used instead of pulse "
-                  "repition frequency.")
+            print(
+                "Nyquist velocity parameter is used instead of pulse "
+                "repetition frequency."
+            )
 
         # show summary of satellite parameters
         self.params

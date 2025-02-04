@@ -1,5 +1,5 @@
 """
-This function writes the output of the orbital radar simulator to a NetCDF 
+This function writes the output of the orbital radar simulator to a NetCDF
 file.
 """
 

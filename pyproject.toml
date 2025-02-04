@@ -6,10 +6,10 @@ build-backend = "hatchling.build"
 name = "orbital-radar"
 version = "0.0.2"
 authors = [
-  { name = "Nils Risse", email = "n.risse@uni-koeln.de" },
-  { name = "Lukas Pfitzenmaier", email = "l.pfitzenmaier@uni-koeln.de" },
-  { name = "Pavlos Kollias" },
-  { name = "Bernat Puigdomenech Treserras" },
+  {name = "Nils Risse", email = "n.risse@uni-koeln.de"},
+  {name = "Lukas Pfitzenmaier", email = "l.pfitzenmaier@uni-koeln.de"},
+  {name = "Pavlos Kollias"},
+  {name = "Bernat Puigdomenech Treserras"}
 ]
 description = "This repository contains the sub-orbital to orbital transformation tool for radar observations, enabling the conversion of radar data from ground or aircraft perspectives to the satellite viewpoint."
 readme = "README.md"
@@ -17,7 +17,7 @@ requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
+  "Operating System :: OS Independent"
 ]
 dependencies = [
   "dask >= 2023.1.0",
@@ -27,11 +27,11 @@ dependencies = [
   "pandas >= 2.0.0",
   "scipy >= 1.10.0",
   "toml >= 0.10.2",
-  "xarray >= 2023.01.0",
+  "xarray >= 2023.01.0"
 ]
 
 [project.optional-dependencies]
-test = ["mypy", "pytest", "ruff"]
+test = ["mypy", "pytest", "ruff", "types-toml"]
 dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "pre-commit", "ipykernel"]
 
 [project.scripts]
@@ -42,6 +42,13 @@ documentation = "https://igmk.github.io/orbital-radar/overview.html"
 
 [tool.mypy]
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["matplotlib.*", "netCDF4.*", "scipy.*", "skimage.*", "pandas.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 79
 
 [tool.ruff.lint]
 select = ["I"]

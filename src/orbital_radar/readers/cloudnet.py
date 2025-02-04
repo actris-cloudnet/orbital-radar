@@ -135,7 +135,6 @@ def read_cloudnet(
 
     # problem did not occur for ecmwf data
     else:
-        
         ds = xr.open_dataset(file)
 
     return ds

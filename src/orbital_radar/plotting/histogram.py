@@ -40,7 +40,9 @@ def plot_histogram(ds, variables, vmax, h, show=False):
         else:
             raise ValueError("Variable type not recognized.")
 
-        plot_single_histogram(ds, variable, variable_type, ax=ax, vmax=vmax[i], h=h)
+        plot_single_histogram(
+            ds, variable, variable_type, ax=ax, vmax=vmax[i], h=h
+        )
 
     if show:
         plt.show()
@@ -93,9 +95,10 @@ def plot_single_histogram(ds, variable, variable_type, ax, vmax, h):
         else:
             ax.set_xlabel("Vm [m s$^{-1}$]")
         ax.set_xlim([-5.7, 5.7])
-    
+
     ax.set_ylabel("Height [km]")
     ax.set_ylim(h)
+
 
 def calculate_histogram(ds, variable, variable_type):
     """

@@ -87,7 +87,7 @@ class Suborbital(Simulator):
             )
 
         # check if config file is provided and exists
-        #if config_file is None:
+        # if config_file is None:
         #    raise ValueError("No configuration file provided")
 
         if not os.path.isfile(config_file):
@@ -128,7 +128,9 @@ class Suborbital(Simulator):
         super().__init__(
             sat_name=self.config["spaceborne_radar"]["sat_name"],
             file_earthcare=self.config["spaceborne_radar"]["file_earthcare"],
-            nyquist_from_prf=self.config["spaceborne_radar"]["nyquist_from_prf"],
+            nyquist_from_prf=self.config["spaceborne_radar"][
+                "nyquist_from_prf"
+            ],
             ms_threshold=self.config["spaceborne_radar"]["ms_threshold"],
             ms_threshold_integral=self.config["spaceborne_radar"][
                 "ms_threshold_integral"
@@ -296,7 +298,7 @@ class Suborbital(Simulator):
 
         if "height" in list(ds.coords.keys()):
             self.is_sea_level = True
-        
+
         else:
             self.is_sea_level = False
 
@@ -697,7 +699,6 @@ class Suborbital(Simulator):
         if self.prepare["attenuation_correction_input"] == "cloudnet_ecmwf":
             lst_da_gas_atten = []
             for time in ds_cloudnet.time:
-
                 # interpolate gas attenuation to radar height grid
                 ds_cloudnet_t = ds_cloudnet.sel(time=time).swap_dims(
                     {"level": "height"}

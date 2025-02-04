@@ -58,12 +58,13 @@ def colormap_vm():
 
     return cmap, norm
 
+
 def colormap_vm_sat():
     """
     Creates colorbar for Doppler velocity.
 
     The colorbar contains three colormaps:
-    - plasma: -6 to 0 
+    - plasma: -6 to 0
     - winter: 0 to 2
     - cool: 2 to 6
 
@@ -76,18 +77,20 @@ def colormap_vm_sat():
     n_colors = 256
 
     # Define the color segments for each colormap
-    plasma_colors = plt.cm.plasma(np.linspace(0, 1, n_colors//2))
-    winter_colors = plt.cm.winter(np.linspace(0, 1, n_colors//4))
-    cool_colors = plt.cm.cool(np.linspace(0, 1, n_colors//4))
+    plasma_colors = plt.cm.plasma(np.linspace(0, 1, n_colors // 2))
+    winter_colors = plt.cm.winter(np.linspace(0, 1, n_colors // 4))
+    cool_colors = plt.cm.cool(np.linspace(0, 1, n_colors // 4))
 
     # Stack the colors to create the full colormap
-    colors = np.vstack((plasma_colors, winter_colors, cool_colors))  
+    colors = np.vstack((plasma_colors, winter_colors, cool_colors))
 
     # Create the colormap
     cmap = mcolors.LinearSegmentedColormap.from_list("vm_colormap_sat", colors)
 
     # make discrete colormap
-    bounds = np.arange(-6, 6+0.5, 0.5) # Adjusted to cover the range from -6 to 6
+    bounds = np.arange(
+        -6, 6 + 0.5, 0.5
+    )  # Adjusted to cover the range from -6 to 6
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     return cmap, norm
@@ -164,9 +167,9 @@ def plot_along_track(
     n_rows = len(variables)
 
     # get colormaps
-    cmap_vm, norm_vm         = colormap_vm_sat()
+    cmap_vm, norm_vm = colormap_vm_sat()
     # cmap_vm_sat, norm_vm_sat = colormap_vm_sat()
-    cmap_ze, norm_ze         = colormap_ze()
+    cmap_ze, norm_ze = colormap_ze()
 
     fig, axes = plt.subplots(
         n_rows,
@@ -208,7 +211,9 @@ def plot_along_track(
                 norm=norm_vm,
                 shading="nearest",
             )
-            fig.colorbar(im, ax=axes[i], extend="both", label="vm [m s$^{-1}$]")
+            fig.colorbar(
+                im, ax=axes[i], extend="both", label="vm [m s$^{-1}$]"
+            )
 
         elif "flag" in var:
             im = axes[i].pcolormesh(

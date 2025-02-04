@@ -138,7 +138,7 @@ def resample(ds, variable):
         ds["height_sat"] - range_resolution / 2,
         ds["height_sat"][-1] + range_resolution / 2,
     )
-    
+
     # assign satellite pixel label to each input pixel of suborbital radar
     ix_range = np.searchsorted(
         ds.height_sat.values,
