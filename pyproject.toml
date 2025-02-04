@@ -21,7 +21,6 @@ classifiers = [
 ]
 dependencies = [
   "dask >= 2023.1.0",
-  "ipykernel >= 6.25.0",
   "matplotlib >= 3.7.0",
   "netCDF4 >= 1.6.2",
   "numpy >= 1.25.0",
@@ -33,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["mypy", "pytest", "ruff"]
-dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "pre-commit"]
+dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "pre-commit", "ipykernel"]
 
 [project.scripts]
 orbital-radar = "orbital_radar.__main__:main"
