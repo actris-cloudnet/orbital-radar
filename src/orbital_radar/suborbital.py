@@ -87,12 +87,10 @@ class Suborbital(Simulator):
             )
 
         # check if config file is provided and exists
-        if config_file is None:
-            raise ValueError("No configuration file provided")
+        #if config_file is None:
+        #    raise ValueError("No configuration file provided")
 
-        if not os.path.isfile(
-            os.path.join(os.environ["ORBITAL_RADAR_CONFIG_PATH"], config_file)
-        ):
+        if not os.path.isfile(config_file):
             raise FileNotFoundError(
                 f"Configuration file {config_file} not found"
             )
