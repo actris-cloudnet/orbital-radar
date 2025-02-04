@@ -272,9 +272,9 @@ class RadarBeam:
 
     def __init__(
         self,
-        file_earthcare=None,
-        sat_name=None,
-        nyquist_from_prf=False,
+        file_earthcare: str | None = None,
+        sat_name: str | None = None,
+        nyquist_from_prf: bool = False,
         **sat_params,
     ):
         """
