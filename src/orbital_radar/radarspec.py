@@ -59,14 +59,14 @@ Tanelli et al. (2008)     : https://doi.org/10.1109/TGRS.2008.2002030
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Union
 
 import numpy as np
+from scipy.constants import c as SPEED_OF_LIGHT
 
 from orbital_radar.helpers import db2li
 from orbital_radar.readers.rangewf import read_range_weighting_function
 
-SPEED_OF_LIGHT = 299792458.0  # unit: m s-1
 RADARS_PREDEFINED = {
     "earthcare": {
         "name": "EarthCARE",
