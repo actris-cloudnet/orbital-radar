@@ -39,6 +39,3 @@ orbital-radar = "orbital_radar.__main__:main"
 
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
-
-[tool.black]
-line-length = 79
