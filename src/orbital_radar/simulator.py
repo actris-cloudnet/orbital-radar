@@ -195,7 +195,7 @@ class Simulator:
         # create bin edges for along-track integration
         # the last radar bin is created only if it is included in the input
         # grid. the same convention is applied to the height grid
-        along_track_sat_edges = np.arange(
+        along_track_sat_edges: np.ndarray = np.arange(
             self.ds["along_track"][0],
             self.ds["along_track"][-1],
             self.beam.spec.along_track_resolution,
@@ -659,14 +659,14 @@ class Simulator:
         # keys: nyquist velocity offset added for folding
         # values: velocity bin edges as multiple of the nyquist velocity
         folding_dct = {
-            -2: [1, 3],
-            -4: [3, 5],
-            -6: [5, 7],
-            -8: [7, 9],
-            2: [-3, -1],
-            4: [-5, -3],
-            6: [-7, -5],
-            8: [-9, -7],
+            -2: [1.0, 3.0],
+            -4: [3.0, 5.0],
+            -6: [5.0, 7.0],
+            -8: [7.0, 9.0],
+            2: [-3.0, -1.0],
+            4: [-5.0, -3.0],
+            6: [-7.0, -5.0],
+            8: [-9.0, -7.0],
         }
 
         # data array with folded velocity

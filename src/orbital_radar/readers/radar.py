@@ -15,6 +15,7 @@ match spaceborne convention.
 import os
 import os.path
 from glob import glob
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -101,8 +102,7 @@ class Radar:
         reader()
 
         if self.ds_rad == xr.Dataset():
-            print("No radar data found.")
-            self.ds_rad = None
+            raise FileNotFoundError("No radar data found.")
 
         else:
             print("Vm sign convention: negative=upward, " "positive=downward")
@@ -387,7 +387,9 @@ class Radar:
         for i, file in enumerate(files):
             self.status_message(i, file, files)
 
-            xr_kwds = dict(drop_variables=["sze"], decode_times=False)
+            xr_kwds: Dict[str, Any] = dict(
+                drop_variables=["sze"], decode_times=False
+            )
             with xr.open_dataset(file, **xr_kwds) as ds:
                 ds.load()
 

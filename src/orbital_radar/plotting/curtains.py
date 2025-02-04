@@ -44,9 +44,9 @@ def colormap_vm():
 
     colors = np.vstack(
         (
-            plt.cm.autumn(np.linspace(0, 1, n_colors // 4)),
-            plt.cm.winter(np.linspace(0, 1, n_colors // 4)),
-            plt.cm.cool(np.linspace(0, 1, n_colors // 2)),
+            plt.get_cmap("autumn")(np.linspace(0, 1, n_colors // 4)),
+            plt.get_cmap("autumn")(np.linspace(0, 1, n_colors // 4)),
+            plt.get_cmap("cool")(np.linspace(0, 1, n_colors // 2)),
         )
     )
 
@@ -77,9 +77,9 @@ def colormap_vm_sat():
     n_colors = 256
 
     # Define the color segments for each colormap
-    plasma_colors = plt.cm.plasma(np.linspace(0, 1, n_colors // 2))
-    winter_colors = plt.cm.winter(np.linspace(0, 1, n_colors // 4))
-    cool_colors = plt.cm.cool(np.linspace(0, 1, n_colors // 4))
+    plasma_colors = plt.get_cmap("plasma")(np.linspace(0, 1, n_colors // 2))
+    winter_colors = plt.get_cmap("winter")(np.linspace(0, 1, n_colors // 4))
+    cool_colors = plt.get_cmap("cool")(np.linspace(0, 1, n_colors // 4))
 
     # Stack the colors to create the full colormap
     colors = np.vstack((plasma_colors, winter_colors, cool_colors))
@@ -101,7 +101,7 @@ def colormap_ze():
     Creates colorbar for radar reflectivity.
     """
 
-    cmap = plt.cm.jet.copy()
+    cmap = plt.get_cmap("jet").copy()
 
     cmap.set_under("gray", 1.0)
     cmap.set_over("black", 1.0)

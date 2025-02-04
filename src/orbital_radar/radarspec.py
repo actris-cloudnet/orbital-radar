@@ -356,7 +356,7 @@ class RadarBeam:
             # update pre-defined satellite parameters with sat_params
             radar_predefined = RADARS_PREDEFINED[sat_name].copy()
             radar_predefined.update(sat_params)
-            self.spec = RadarSpec(**radar_predefined)
+            self.spec = RadarSpec(**radar_predefined)  # type: ignore
 
         # set satellite parameters from user-specified satellite
         else:
@@ -554,7 +554,7 @@ class RadarBeam:
         # velocity error due to satellite velocity
         self.velocity_error = (
             self.spec.velocity / self.spec.altitude
-        ) * self.atrack_bins
+        ) * self.atrack_bins  # type: ignore
 
     def calculate_along_range(self, range_coords):
         """

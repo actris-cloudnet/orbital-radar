@@ -10,7 +10,7 @@ try:
 
     MODE = "rb"
 except ImportError:
-    import toml
+    import toml  # type: ignore
 
     MODE = "r"
 
@@ -30,28 +30,12 @@ def read_config(filename):
         Configuration dictionary
     """
 
-    # use filename if environment variable does not exist, otherwise combine
-    if os.getenv("ORBITAL_RADAR_CONFIG_PATH") is not None:
-        # this uses filename if it is an absolute path, otherwise it uses
-        # the path from the environment variable
-        filename = os.path.join(
-            os.getenv("ORBITAL_RADAR_CONFIG_PATH"), filename
-        )
-
-    else:
-        # check if filename is an absolute path, otherwise use the current
-        # working directory
-        if not os.path.isabs(filename):
-            filename = os.path.join(os.getcwd(), filename)
-
-    # make sure that file exists
     if not os.path.isfile(filename):
         raise FileNotFoundError(f"Config file {filename} not found")
 
     with open(filename, MODE) as f:
         config = toml.load(f)
 
-    # validate config
     check_config(config)
 
     return config
