@@ -117,14 +117,12 @@ def main():
 
     sub = Suborbital(
         geometry=args.geometry,
-        name=args.name,
         config_file=args.config_file,
-        suborbital_radar=args.suborbital_radar,
         input_radar_format=args.input_radar_format,
     )
 
     if args.date is not None:
-        sub.run_date(args.date, "", "")
+        sub.run_date(args.date, "", "", "")
 
     else:
         sub.run(start_date=args.start_date, end_date=args.end_date)

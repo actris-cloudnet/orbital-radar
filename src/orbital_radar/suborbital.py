@@ -33,68 +33,25 @@ class Suborbital(Simulator):
     Run the simulator for suborbital radar data.
     """
 
-    # list of all suborbital radar locations
-    names = {
-        "groundbased": [
-            "bco",
-            "jue",
-            "nor",
-            "mag",
-            "min",
-            "nya",
-            "arm",
-            "pamtra",
-        ],
-        "airborne": [
-            "mp5",
-            "rasta",
-        ],
-    }
-
     def __init__(
         self,
-        geometry: str,
-        name: str,
         config_file: str,
-        suborbital_radar: str,
+        geometry: str = "groundbased",
         input_radar_format: str = "cloudnet",
-        path_out: str | None = None,
     ):
         """
         Initialize the simulator for suborbital radar data.
 
         Parameters
         ----------
-        geometry : str
-            Observation geometry of radar (groundbased or airborne).
-        name : str
-            Name of the suborbital radar (abbreviated).
         config_file : str
             Path to the configuration file that contains the site-dependent
             parameters and directory paths.
-        suborbital_radar : str
-            Name of the suborbital radar (abbreviated).
+        geometry : str
+            Observation geometry of radar (groundbased or airborne).
         input_radar_format : str
             Format of the input radar data (e.g. cloudnet).
         """
-
-        # make sure that geometry is valid
-        if geometry not in self.names.keys():
-            raise ValueError(
-                f"Geometry {geometry} not implemented. Choose from "
-                f"{list(self.names.keys())}"
-            )
-
-        # check if site is in list of implemented sites
-        if name not in self.names[geometry]:
-            raise ValueError(
-                f"Site {name} not implemented. Choose from "
-                f"{self.names[geometry]}"
-            )
-
-        # check if config file is provided and exists
-        # if config_file is None:
-        #    raise ValueError("No configuration file provided")
 
         if not os.path.isfile(config_file):
             raise FileNotFoundError(
@@ -103,8 +60,6 @@ class Suborbital(Simulator):
 
         # set class attributes
         self.geometry = geometry
-        self.name = name
-        self.suborbital_radar = suborbital_radar
         self.input_radar_format = input_radar_format
 
         # attributes that will be derived
@@ -113,25 +68,16 @@ class Suborbital(Simulator):
         # read configuration file
         self.config = read_config(config_file)
 
-        # check if output path exists
-        # assert os.path.exists(
-        #    self.config["paths"][self.name]["output"]
-        # ), f"Output path {self.config['paths'][self.name]['output']} does not exist"
-
-        if path_out is not None:
-            self.path_out = path_out
-        else:
-            self.path_out = self.config["paths"][self.name]["output"]
-        self.frequency = self.config["suborbital_radar"][
-            self.suborbital_radar
-        ]["frequency"]
+        # TODO: read these from radar file or add parameter
+        self.frequency = 94
+        self.radar_k2 = 0.86
 
         # preparation of input radar data
         self.prepare = self.config["prepare"]["general"]
         self.prepare.update(self.config["prepare"][self.geometry])
 
         # overview of simulation settings
-        # self.summary
+        self.summary
 
         # initialize simulator class with spaceborne radar settings
         super().__init__(
@@ -153,12 +99,6 @@ class Suborbital(Simulator):
         Prints short summary of simulator settings.
         """
 
-        print(f"Site: {self.name}")
-        print("\n")
-
-        print("Directory paths:")
-        print(f"Input: {self.config['paths'][self.name]['radar']}")
-        print(f"Output: {self.config['paths'][self.name]['output']}")
         print("\n")
 
         if self.geometry == "groundbased":
@@ -253,10 +193,7 @@ class Suborbital(Simulator):
             Data with "ze" variable.
         """
 
-        correction = (
-            self.config["spaceborne_radar"]["k2"]
-            / self.config["suborbital_radar"][self.suborbital_radar]["k2"]
-        )
+        correction = self.config["spaceborne_radar"]["k2"] / self.radar_k2
 
         ds["ze"] = db2li(li2db(ds["ze"]) + 10 * np.log10(correction))
 
@@ -362,10 +299,7 @@ class Suborbital(Simulator):
             v = self.prepare["mean_flight_velocity"]
 
         else:
-            raise ValueError(
-                f"Geometry {self.geometry} not implemented. Choose from "
-                f"{list(self.names.keys())}"
-            )
+            raise ValueError
 
         # calculate the along-track distance
         dt = ds.time.diff("time") / np.timedelta64(1, "s")
@@ -588,7 +522,7 @@ class Suborbital(Simulator):
             ),
         )
 
-    def to_netcdf(self, date):
+    def to_netcdf(self, output_filepath: str):
         """
         Writes dataset to netcdf file. Note that not all variables are stored.
 
@@ -621,30 +555,7 @@ class Suborbital(Simulator):
         if self.geometry == "airborne":
             output_variables += ["mean_flight_velocity"]
 
-        # name of output nc file
-        filename = (
-            "_".join(
-                [
-                    "ora",
-                    __version__,
-                    self.config["spaceborne_radar"]["sat_name"],
-                    "l1",
-                    self.geometry,
-                    self.name,
-                    self.suborbital_radar,
-                    pd.Timestamp(date).strftime("%Y%m%d") + "T000000",
-                    pd.Timestamp(date).strftime("%Y%m%d") + "T235959",
-                ]
-            )
-            + ".nc"
-        )
-
-        filename = os.path.join(
-            self.path_out,
-            filename,
-        )
-
-        write_spaceview(ds=self.ds[output_variables], filename=filename)
+        write_spaceview(ds=self.ds[output_variables], filename=output_filepath)
 
     def add_attenuation(self, ds, da_gas_atten):
         """
@@ -768,7 +679,7 @@ class Suborbital(Simulator):
         date,
         radar_filepath: str,
         categorize_filepath: str,
-        write_output: bool = True,
+        output_filepath: str,
     ):
         """
         Runs simulation for a single day.
@@ -783,7 +694,6 @@ class Suborbital(Simulator):
 
         radar = Radar(
             date=date,
-            site_name=self.name,
             radar_filepath=radar_filepath,
             input_radar_format=self.input_radar_format,
             categorize_filepath=categorize_filepath,
@@ -852,11 +762,9 @@ class Suborbital(Simulator):
         if self.geometry == "airborne":
             self.add_airborne_variables()
 
-        # write output to file
-        if write_output:
-            self.to_netcdf(date=date)
+        self.to_netcdf(output_filepath)
 
-    def run(self, start_date, end_date, write_output=True):
+    def run(self, start_date, end_date):
         """
         Runs simulation for all days in the time frame.
 
@@ -872,5 +780,4 @@ class Suborbital(Simulator):
 
         for i, date in enumerate(dates):
             print(f"Processing {date} ({i+1}/{len(dates)})")
-
-            self.run_date(date, "", "")
+            self.run_date(date, "", "", "")

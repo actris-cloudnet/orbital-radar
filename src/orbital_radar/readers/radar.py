@@ -49,7 +49,6 @@ class Radar:
     def __init__(
         self,
         date,
-        site_name: str,
         radar_filepath: str,
         input_radar_format: str,
         categorize_filepath: str | None = None,
@@ -66,8 +65,6 @@ class Radar:
         ----------
         date : pd.Timestamp
             Radar data will be read for this day
-        site_name : str
-            Name of the radar site (e.g. Mindelo)
         path : str
             Directory of radar data. The NetCDF files are expected inside a
             sub-folder structure starting from path: "path/yyyy/mm/dd/*.nc".
@@ -80,7 +77,6 @@ class Radar:
         """
 
         self.date = pd.Timestamp(date)
-        self.site_name = site_name
         self.radar_filepath = radar_filepath
         self.categorize_filepath = categorize_filepath
         self.make_date_path()
@@ -117,7 +113,7 @@ class Radar:
 
             self.ds_rad["vm"] = -self.ds_rad["vm"]
 
-            print(f"Quality checks for {self.site_name} radar data.")
+            print(f"Quality checks for radar data.")
 
             # ensure ze and vm variables exist
             assert "ze" in list(self.ds_rad)
