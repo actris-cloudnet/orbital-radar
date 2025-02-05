@@ -2,6 +2,8 @@
 Runs the orbital radar simulator.
 """
 
+from pathlib import Path
+
 import numpy as np
 import xarray as xr
 from scipy import stats
@@ -22,11 +24,11 @@ class Simulator:
 
     def __init__(
         self,
-        sat_name,
-        file_earthcare=None,
-        nyquist_from_prf=False,
-        ms_threshold=12,
-        ms_threshold_integral=41,
+        file_earthcare: Path,
+        sat_name: str = "earthcare",
+        nyquist_from_prf: bool = False,
+        ms_threshold: float = 12.0,
+        ms_threshold_integral: float = 41.0,
         **radar_specs,
     ):
         """
@@ -1016,75 +1018,75 @@ class Simulator:
         self.ds = ds
 
         # check input dataset for consistency
-        print("Check input dataset")
+        # print("Check input dataset")
         self.check_input_dataset()
 
         # prepare input dataset for computations
-        print("Prepare input dataset")
+        # print("Prepare input dataset")
         self.prepare_input_dataset()
 
         # compute weighting functions
-        print("Compute weighting functions")
+        # print("Compute weighting functions")
         self.beam.calculate_weighting_functions(
             range_coords=self.ds["height"],
             along_track_coords=self.ds["along_track"],
         )
 
         # detection limit
-        print("Apply detection limit to input data")
+        # print("Apply detection limit to input data")
         self.apply_detection_limit(var_ze="ze", var_other=["ze", "vm"])
 
         # transformations to spaceborne radar
-        print("Convolve along track")
+        # print("Convolve along track")
         self.convolve_along_track()
 
-        print("Integrate along track")
+        # print("Integrate along track")
         self.integrate_along_track()
 
-        print("Convolve height")
+        # print("Convolve height")
         self.convolve_height()
 
         # detection limit
-        print("Apply detection limit on satellite view")
+        # print("Apply detection limit on satellite view")
         self.apply_detection_limit(
             var_ze="ze_sat", var_other=["ze_sat", "vm_sat", "vm_sat_vel"]
         )
 
         # noise
-        print("Calculate Ze noise")
+        # print("Calculate Ze noise")
         self.calculate_ze_noise()
 
-        print("Calculate Vm noise")
+        # print("Calculate Vm noise")
         self.calculate_vm_noise()
 
         # doppler velocity folding
-        print("Fold Vm")
+        # print("Fold Vm")
         self.fold_vm()
 
         # non-uniform beam filling
-        print("Calculate non-uniform beam filling")
+        # print("Calculate non-uniform beam filling")
         self.calculate_nubf()
 
         # non-uniform beam filling flag
-        print("Calculate non-uniform beam filling flag")
+        # print("Calculate non-uniform beam filling flag")
         self.calculate_nubf_flag()
 
         # doppler velocity bias
-        print("Calculate Doppler velocity bias")
+        # print("Calculate Doppler velocity bias")
         self.calculate_vm_bias()
 
         # doppler velocity bias flag
-        print("Calculate Doppler velocity bias flag")
+        # print("Calculate Doppler velocity bias flag")
         self.calculate_vm_bias_flag()
 
         # multiple scattering flag
-        print("Calculate multiple scattering flag")
+        # print("Calculate multiple scattering flag")
         self.calculate_ms_flag()
 
         # signal fraction
-        print("Calculate signal fraction")
+        # print("Calculate signal fraction")
         self.calculate_signal_fraction()
 
         # set attributes
-        print("Add attributes")
+        # print("Add attributes")
         self.add_attributes()

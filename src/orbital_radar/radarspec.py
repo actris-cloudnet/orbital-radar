@@ -1,3 +1,5 @@
+import logging
+
 """
 This module contains the satellite class and functions to calculate the
 along-track and along-range averaging parameters. Main method and
@@ -272,7 +274,7 @@ class RadarBeam:
 
     def __init__(
         self,
-        file_earthcare: str | None = None,
+        file_earthcare: Path,
         sat_name: str | None = None,
         nyquist_from_prf: bool = False,
         **sat_params,
@@ -306,50 +308,6 @@ class RadarBeam:
             as a parameter. Default is False.
         **sat_params: keyword arguments to overwrite the predefined satellite
         """
-
-        # check if either sat_name or sat_params is given
-        if sat_name is None and sat_params is None:
-            raise ValueError("Either sat_name or sat_params must be given")
-
-        # check if sat_name is valid
-        if sat_name is not None and sat_name not in RADARS_PREDEFINED.keys():
-            raise ValueError(
-                f"Unknown satellite name: {sat_name}. "
-                f"Valid names are: {RADARS_PREDEFINED.keys()}"
-            )
-
-        # check if sat_params are valid
-        for key in sat_params.keys():
-            if key not in RADARS_PREDEFINED["earthcare"].keys():
-                raise ValueError(f"Unknown parameter: {key}")
-
-        # check if all keys are given if no satellite name is given
-        if sat_name is None and sat_params is not None:
-            for key in RADARS_PREDEFINED["earthcare"].keys():
-                if key not in sat_params.keys():
-                    raise ValueError(f"Parameter {key} missing")
-
-        # check if file to EarthCARE CPR weighting function exists
-        if sat_name == "earthcare" and file_earthcare is not None:
-            if not Path(file_earthcare).exists():
-                raise ValueError(
-                    f"EarthCARE CPR weighting function file does not exist: "
-                    f"{file_earthcare}"
-                )
-
-        # warn if file for EarthCARE CPR weighting function is not given
-        if sat_name == "earthcare" and file_earthcare is None:
-            print(
-                "Warning: EarthCARE CPR weighting function file is not given. "
-                "Gaussian range weighting function will be used instead."
-            )
-
-        # warn that earthcare weighting function is not used
-        if sat_name != "earthcare" and file_earthcare is not None:
-            print(
-                "Warning: EarthCARE CPR weighting function file is not used "
-                "because satellite name is not 'earthcare'"
-            )
 
         # set satellite parameters from pre-defined satellites
         if sat_name is not None:
@@ -390,19 +348,19 @@ class RadarBeam:
 
         # calculate Nyquist velocity from pulse repetition frequency
         if nyquist_from_prf:
-            print(
+            logging.info(
                 "Nyquist velocity is calculated from pulse repetition frequency."
             )
             self.calculate_nyquist_velocity()
 
         else:
-            print(
+            logging.info(
                 "Nyquist velocity parameter is used instead of pulse "
                 "repetition frequency."
             )
 
         # show summary of satellite parameters
-        self.params
+        # self.params
 
     @property
     def params(self):

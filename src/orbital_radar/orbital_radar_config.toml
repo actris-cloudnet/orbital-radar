@@ -14,10 +14,3 @@ ground_echo_pulse_length = 100
 
 [prepare.groundbased]
 mean_wind = 6
-
-[spaceborne_radar]
-sat_name = 'earthcare'
-ms_threshold = 12
-ms_threshold_integral = 41
-k2 = 0.75
-nyquist_from_prf = false

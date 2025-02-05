@@ -12,10 +12,6 @@ for upward motion. This is changed to negative upward and positive downward to
 match spaceborne convention.
 """
 
-import os
-import os.path
-from glob import glob
-
 import numpy as np
 import xarray as xr
 
@@ -29,8 +25,7 @@ class Radar:
 
     def __init__(
         self,
-        radar_filepath: str,
-        categorize_filepath: str | None = None,
+        categorize_filepath: str,
     ) -> None:
         """
         Reads radar data with these standardized output variables:
@@ -45,21 +40,12 @@ class Radar:
         categorize_filepath : str
         """
 
-        self.radar_filepath = radar_filepath
         self.categorize_filepath = categorize_filepath
-        self.ds_rad = xr.Dataset()
+        self.ds_rad = self.read_cloudnet()
 
-        self.read_cloudnet()
-
-        print("Vm sign convention: negative=upward, " "positive=downward")
+        # print("Vm sign convention: negative=upward, " "positive=downward")
 
         self.ds_rad["vm"] = -self.ds_rad["vm"]
-
-        print(f"Quality checks for radar data.")
-
-        # ensure ze and vm variables exist
-        assert "ze" in list(self.ds_rad)
-        assert "vm" in list(self.ds_rad)
 
         # ensure same dimension order
         if "height" in list(self.ds_rad.dims):
@@ -87,7 +73,7 @@ class Radar:
         # make sure that alt is in the data
         assert "alt" in list(self.ds_rad), "Altitude not found."
 
-    def read_cloudnet(self):
+    def read_cloudnet(self) -> xr.Dataset:
         """
         Reads radar reflectivity and Doppler velocity from Cloudnet categorize
         files.
@@ -95,29 +81,25 @@ class Radar:
         Note: Cloudnet height is already in height above mean sea level.
         """
 
-        if self.categorize_filepath is None:
-            raise FileNotFoundError("No categorize file found.")
-
         ds = xr.open_dataset(self.categorize_filepath)
 
         ds = ds.rename({"Z": "ze", "v": "vm"})
 
-        self.ds_rad = ds[["ze", "vm"]]
+        ds_radar = ds[["ze", "vm"]]
 
         # extract instrument location and altitude
-        self.ds_rad["lon"] = ds["longitude"]
-        self.ds_rad["lat"] = ds["latitude"]
-        self.ds_rad["alt"] = ds["altitude"]
+        ds_radar["lon"] = ds["longitude"]
+        ds_radar["lat"] = ds["latitude"]
+        ds_radar["alt"] = ds["altitude"]
 
         # convert from dB to linear units
-        self.ds_rad["ze"] = 10 ** (0.1 * self.ds_rad["ze"])
+        ds_radar["ze"] = 10 ** (0.1 * ds_radar["ze"])
 
         # set inf ze to nan
-        self.ds_rad["ze"] = self.ds_rad["ze"].where(
-            self.ds_rad["ze"] != np.inf
-        )
+        ds_radar["ze"] = ds_radar["ze"].where(ds_radar["ze"] != np.inf)
 
         # set very low vm to nan
-        self.ds_rad["vm"] = self.ds_rad["vm"].where(self.ds_rad["vm"] > -500)
+        ds_radar["vm"] = ds_radar["vm"].where(ds_radar["vm"] > -500)
+        ds_radar["vm"] = ds_radar["vm"].where(ds_radar["vm"] < 500)
 
-        self.ds_rad["vm"] = self.ds_rad["vm"].where(self.ds_rad["vm"] < 500)
+        return ds_radar
