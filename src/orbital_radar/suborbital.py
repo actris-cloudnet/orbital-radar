@@ -618,7 +618,6 @@ class Suborbital(Simulator):
 
     def simulate_cloudnet(
         self,
-        date,
         radar_filepath: str,
         categorize_filepath: str,
         output_filepath: str,
@@ -635,9 +634,7 @@ class Suborbital(Simulator):
         """
 
         radar = Radar(
-            date=date,
             radar_filepath=radar_filepath,
-            input_radar_format=self.input_radar_format,
             categorize_filepath=categorize_filepath,
         )
 
@@ -670,21 +667,3 @@ class Suborbital(Simulator):
         self.add_groundbased_variables()
 
         self.to_netcdf(output_filepath)
-
-    def run(self, start_date, end_date):
-        """
-        Runs simulation for all days in the time frame.
-
-        Parameters
-        ----------
-        start_date : np.datetime64
-            Start date.
-        end_date : np.datetime64
-            End date (inclusive).
-        """
-
-        dates = self.prepare_dates(start_date, end_date)
-
-        for i, date in enumerate(dates):
-            print(f"Processing {date} ({i+1}/{len(dates)})")
-            self.simulate_cloudnet(date, "", "", "")

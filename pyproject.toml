@@ -32,10 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["mypy", "pytest", "ruff", "types-toml"]
-dev = ["numpydoc", "sphinx", "sphinx_rtd_theme", "pre-commit", "ipykernel"]
-
-[project.scripts]
-orbital-radar = "orbital_radar.__main__:main"
+dev = ["numpydoc", "pre-commit"]
 
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
