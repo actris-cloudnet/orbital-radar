@@ -18,7 +18,7 @@ class TestRadarSpec:
 
         beam.spec.frequency = 10e9
 
-        beam.calculate_wavelength()
+        beam._calculate_wavelength()
 
         assert np.round(beam.wavelength, 2) == 0.03
 
@@ -54,6 +54,6 @@ class TestRadarSpec:
             pulse_repetition_frequency=7150,
         )
 
-        beam.calculate_nyquist_velocity()
+        beam._calculate_nyquist_velocity()
 
         assert np.abs(beam.spec.nyquist_velocity - 5.7) < 0.1

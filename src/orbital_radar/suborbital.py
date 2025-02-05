@@ -381,7 +381,7 @@ class Suborbital(Simulator):
         )
 
         # calculate range weighting function
-        weights = RadarBeam.normalized_range_weighting_function_default(
+        weights = RadarBeam._normalized_range_weighting_function_default(
             pulse_length=self.prepare["ground_echo_pulse_length"],
             range_bins=height_bins,
         )

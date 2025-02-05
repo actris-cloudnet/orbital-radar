@@ -344,14 +344,14 @@ class RadarBeam:
         self.velocity_error = np.nan
 
         # calculate derived parameters
-        self.calculate_wavelength()
+        self._calculate_wavelength()
 
         # calculate Nyquist velocity from pulse repetition frequency
         if nyquist_from_prf:
             logging.info(
                 "Nyquist velocity is calculated from pulse repetition frequency."
             )
-            self.calculate_nyquist_velocity()
+            self._calculate_nyquist_velocity()
 
         else:
             logging.info(
@@ -361,6 +361,27 @@ class RadarBeam:
 
         # show summary of satellite parameters
         # self.params
+
+    def calculate_weighting_functions(self, along_track_coords, range_coords):
+        """
+        Calculates the along-track and along-range weighting functions.
+
+        Parameters
+        ----------
+        along_track_coords : array
+            along-track coordinates of the ground-based radar [m]
+        range_coords : array
+            range coordinates of the ground-based radar [m]
+        """
+
+        # calculate along-track averaging parameters
+        self._calculate_along_track(along_track_coords=along_track_coords)
+
+        # calculate velocity error due to satellite velocity
+        self._calculate_velocity_error()
+
+        # calculate along-range averaging parameters
+        self._calculate_along_range(range_coords=range_coords)
 
     @property
     def params(self):
@@ -379,7 +400,7 @@ class RadarBeam:
             f"Pulse repetition frequency: {np.round(self.spec.pulse_repetition_frequency, 0)} Hz\n"
         )
 
-    def calculate_wavelength(self):
+    def _calculate_wavelength(self):
         """
         Calculates the radar wavelength from the radar frequency.
 
@@ -392,7 +413,7 @@ class RadarBeam:
 
         self.wavelength = SPEED_OF_LIGHT / self.spec.frequency
 
-    def calculate_nyquist_velocity(self):
+    def _calculate_nyquist_velocity(self):
         """
         Calculates the Nyquist velocity from the pulse repetition frequency
         and the radar wavelength.
@@ -402,7 +423,7 @@ class RadarBeam:
             self.wavelength * self.spec.pulse_repetition_frequency / 4
         )
 
-    def calculate_ifov(self):
+    def _calculate_ifov(self):
         """
         Calculates the instantaneous field of view (IFOV) from the along-track
         averaging parameters.
@@ -420,7 +441,7 @@ class RadarBeam:
             * self.spec.ifov_scale
         )
 
-    def create_along_track_grid(self, along_track_coords):
+    def _create_along_track_grid(self, along_track_coords):
         """
         Creates the along-track grid.
 
@@ -449,7 +470,7 @@ class RadarBeam:
             np.arange(0, self.ifov / 2, step),
         )
 
-    def create_along_range_grid(self, range_coords):
+    def _create_along_range_grid(self, range_coords):
         """
         Creates range grid at which range weighting function is evaluated.
 
@@ -478,7 +499,7 @@ class RadarBeam:
             step,
         )
 
-    def calculate_along_track(self, along_track_coords):
+    def _calculate_along_track(self, along_track_coords):
         """
         Calculates along-track averaging parameters.
 
@@ -489,10 +510,10 @@ class RadarBeam:
         """
 
         # instantaneous field of view
-        self.calculate_ifov()
+        self._calculate_ifov()
 
         # calculate along-track grid
-        self.create_along_track_grid(along_track_coords=along_track_coords)
+        self._create_along_track_grid(along_track_coords=along_track_coords)
 
         # along-track weighting function
         w_at = np.exp(
@@ -504,7 +525,7 @@ class RadarBeam:
             np.sum(self.atrack_weights) - 1 < 1e-10
         ), "Along-track weighting function is not normalized"
 
-    def calculate_velocity_error(self):
+    def _calculate_velocity_error(self):
         """
         Calculates the velocity error due to satellite velocity.
         """
@@ -514,7 +535,7 @@ class RadarBeam:
             self.spec.velocity / self.spec.altitude
         ) * self.atrack_bins  # type: ignore
 
-    def calculate_along_range(self, range_coords):
+    def _calculate_along_range(self, range_coords):
         """
         Calculates along-range averaging parameters.
 
@@ -524,23 +545,23 @@ class RadarBeam:
             range coordinates of the ground-based radar [m]
         """
 
-        self.create_along_range_grid(range_coords=range_coords)
+        self._create_along_range_grid(range_coords=range_coords)
 
         # range weighting function
         if self.sat_name == "earthcare" and self.file_earthcare is not None:
             self.range_weights = (
-                self.normalized_range_weighting_function_earthcare()
+                self._normalized_range_weighting_function_earthcare()
             )
 
         else:
             self.range_weights = (
-                self.normalized_range_weighting_function_default(
+                self._normalized_range_weighting_function_default(
                     pulse_length=self.spec.pulse_length,
                     range_bins=self.range_bins,
                 )
             )
 
-    def normalized_range_weighting_function_earthcare(self):
+    def _normalized_range_weighting_function_earthcare(self):
         """
         Prepares EarthCARE range weighting function for along-range averaging.
 
@@ -574,7 +595,7 @@ class RadarBeam:
         return range_weights
 
     @staticmethod
-    def normalized_range_weighting_function_default(pulse_length, range_bins):
+    def _normalized_range_weighting_function_default(pulse_length, range_bins):
         """
         Defines the range weighting function for the along-range averaging.
         """
@@ -585,24 +606,3 @@ class RadarBeam:
         range_weights = range_weights / np.sum(range_weights)  # normalization
 
         return range_weights
-
-    def calculate_weighting_functions(self, along_track_coords, range_coords):
-        """
-        Calculates the along-track and along-range weighting functions.
-
-        Parameters
-        ----------
-        along_track_coords : array
-            along-track coordinates of the ground-based radar [m]
-        range_coords : array
-            range coordinates of the ground-based radar [m]
-        """
-
-        # calculate along-track averaging parameters
-        self.calculate_along_track(along_track_coords=along_track_coords)
-
-        # calculate velocity error due to satellite velocity
-        self.calculate_velocity_error()
-
-        # calculate along-range averaging parameters
-        self.calculate_along_range(range_coords=range_coords)
