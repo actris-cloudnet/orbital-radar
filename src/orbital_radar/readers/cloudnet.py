@@ -15,9 +15,7 @@ FILENAMES = {
 }
 
 
-def read_cloudnet(
-    attenuation_correction_input, date, site_name, path, add_date=True
-):
+def read_cloudnet_attenuation_file(filepath, date):
     """
     Reads Cloudnet data.
 
@@ -27,17 +25,10 @@ def read_cloudnet(
 
     Parameters
     ----------
-    attenuation_correction_input: str
+    filepath: str
         Cloudnet product to read. Either 'categorize' or 'ecmwf'.
     date: np.datetime64
         Date for which data is read.
-    site_name: str
-        Name of the site.
-    path: str
-        Path to the Cloudnet data. The path should contain the year, month, and
-        day as subdirectories.
-    add_date: bool, optional
-        If True, the date is added to the path. Default is True.
 
     Returns
     -------
@@ -45,50 +36,11 @@ def read_cloudnet(
         Cloudnet data.
     """
 
-    if add_date:
-        path = os.path.join(
-            path,
-            pd.Timestamp(date).strftime(r"%Y"),
-            pd.Timestamp(date).strftime(r"%m"),
-            pd.Timestamp(date).strftime(r"%d"),
-        )
-
-    if not os.path.exists(path):
-        print(f"Warning: The cloudnet data path {path} does not exist")
-        print("Warning: No attenuation correction will be applied")
-
-        return None
-
-    files = glob(
-        os.path.join(path, f"*{FILENAMES[attenuation_correction_input]}.nc")
-    )
-
-    # return none if no files are found
-    if len(files) == 0:
-        # print warning
-        print(
-            f"No {attenuation_correction_input} Cloudnet files found "
-            f"for {date} at "
-            f"{site_name}"
-        )
-
-        return None
-
-    # warn if more than one file is found
-    if len(files) > 1:
-        print(
-            f"More than one {attenuation_correction_input} Cloudnet file "
-            f"found for "
-            f"{date} at {site_name}. Reading first file."
-        )
-
-    file = files[0]
-
-    print(f"Reading {attenuation_correction_input} Cloudnet data: {file}")
+    print(f"Reading {filepath} Cloudnet data")
 
     # model_time unit for older cloudnetpy versions in bad format
-    if attenuation_correction_input == "cloudnet_categorize":
-        ds = xr.open_dataset(file, decode_times=False)
+    if filepath == "cloudnet_categorize":
+        ds = xr.open_dataset(filepath, decode_times=False)
 
         if (
             ds["model_time"].units == "decimal hours since midnight"
@@ -116,7 +68,7 @@ def read_cloudnet(
         ) < np.timedelta64(12, "h"):
             print(
                 f"Warning: The time difference between the first and last time "
-                f"step is less than 12 hours for {date} at {site_name}. "
+                f"step is less than 12 hours for {date}. "
                 f"Check if time format is being read correctly."
             )
 
@@ -127,7 +79,7 @@ def read_cloudnet(
         ):
             print(
                 f"Warning: The time difference between the first and last time "
-                f"step is less than 12 hours for {date} at {site_name}. "
+                f"step is less than 12 hours for {date}. "
                 f"Check if time format is being read correctly."
             )
 
@@ -135,7 +87,7 @@ def read_cloudnet(
 
     # problem did not occur for ecmwf data
     else:
-        ds = xr.open_dataset(file)
+        ds = xr.open_dataset(filepath)
 
     return ds
 

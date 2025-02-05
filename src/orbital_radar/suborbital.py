@@ -20,7 +20,7 @@ import xarray as xr
 
 from orbital_radar.helpers import db2li, li2db
 from orbital_radar.radarspec import RadarBeam
-from orbital_radar.readers.cloudnet import read_cloudnet
+from orbital_radar.readers.cloudnet import read_cloudnet_attenuation_file
 from orbital_radar.readers.config import read_config
 from orbital_radar.readers.radar import Radar
 from orbital_radar.simulator import Simulator
@@ -52,7 +52,13 @@ class Suborbital(Simulator):
     }
 
     def __init__(
-        self, geometry, name, config_file, suborbital_radar, input_radar_format
+        self,
+        geometry: str,
+        name: str,
+        config_file: str,
+        suborbital_radar: str,
+        input_radar_format: str = "cloudnet",
+        path_out: str | None = None,
     ):
         """
         Initialize the simulator for suborbital radar data.
@@ -108,11 +114,14 @@ class Suborbital(Simulator):
         self.config = read_config(config_file)
 
         # check if output path exists
-        assert os.path.exists(
-            self.config["paths"][self.name]["output"]
-        ), f"Output path {self.config['paths'][self.name]['output']} does not exist"
+        # assert os.path.exists(
+        #    self.config["paths"][self.name]["output"]
+        # ), f"Output path {self.config['paths'][self.name]['output']} does not exist"
 
-        self.path_out = self.config["paths"][self.name]["output"]
+        if path_out is not None:
+            self.path_out = path_out
+        else:
+            self.path_out = self.config["paths"][self.name]["output"]
         self.frequency = self.config["suborbital_radar"][
             self.suborbital_radar
         ]["frequency"]
@@ -122,7 +131,7 @@ class Suborbital(Simulator):
         self.prepare.update(self.config["prepare"][self.geometry])
 
         # overview of simulation settings
-        self.summary
+        # self.summary
 
         # initialize simulator class with spaceborne radar settings
         super().__init__(
@@ -754,7 +763,13 @@ class Suborbital(Simulator):
 
         return ds
 
-    def run_date(self, date, write_output=True):
+    def run_date(
+        self,
+        date,
+        radar_filepath: str,
+        categorize_filepath: str,
+        write_output: bool = True,
+    ):
         """
         Runs simulation for a single day.
 
@@ -766,33 +781,24 @@ class Suborbital(Simulator):
             If True, write output to netcdf file.
         """
 
-        # read radar data
-        if self.input_radar_format == "cloudnet":
-            radar_path = self.config["paths"][self.name]["cloudnet"]
-        else:
-            radar_path = self.config["paths"][self.name]["radar"]
-
-        rad = Radar(
+        radar = Radar(
             date=date,
             site_name=self.name,
-            path=radar_path,
+            radar_filepath=radar_filepath,
             input_radar_format=self.input_radar_format,
+            categorize_filepath=categorize_filepath,
         )
 
         # skip if radar data does not exist
-        if rad.ds_rad is None:
+        if radar.ds_rad is None:
             print(f"{date}: No radar data found")
             return
 
         # read cloudnet data
         if self.geometry == "groundbased":
-            ds_cloudnet = read_cloudnet(
-                attenuation_correction_input=self.prepare[
-                    "attenuation_correction_input"
-                ],
+            ds_cloudnet = read_cloudnet_attenuation_file(
+                filepath=categorize_filepath,
                 date=date,
-                site_name=self.name,
-                path=self.config["paths"][self.name]["cloudnet"],
             )
 
             if ds_cloudnet is None:
@@ -800,18 +806,18 @@ class Suborbital(Simulator):
 
         # frequency conversion
         if self.frequency == 35:
-            rad.ds_rad = self.convert_frequency(rad.ds_rad)
+            radar.ds_rad = self.convert_frequency(radar.ds_rad)
 
         # correct dielectric constant
         if self.frequency == 94:
-            rad.ds_rad = self.correct_dielectric_constant(rad.ds_rad)
+            radar.ds_rad = self.correct_dielectric_constant(radar.ds_rad)
 
         # range to height
-        self.check_is_sea_level(rad.ds_rad)
+        self.check_is_sea_level(radar.ds_rad)
 
         if (self.geometry == "groundbased") and not self.is_sea_level:
             print("Converting radar range grid to height above mean sea level")
-            rad.ds_rad = self.range_to_height(rad.ds_rad)
+            radar.ds_rad = self.range_to_height(radar.ds_rad)
         else:
             print(
                 "Assume that input radar grid is defined as height above mean "
@@ -819,10 +825,10 @@ class Suborbital(Simulator):
             )
 
         # create along track dimension
-        rad.ds_rad = self.create_along_track(ds=rad.ds_rad)
+        radar.ds_rad = self.create_along_track(ds=radar.ds_rad)
 
         # interpolate to regular grid
-        ds = self.interpolate_to_regular_grid(rad.ds_rad)
+        ds = self.interpolate_to_regular_grid(radar.ds_rad)
 
         if self.geometry == "groundbased":
             # attenuation correction
@@ -867,4 +873,4 @@ class Suborbital(Simulator):
         for i, date in enumerate(dates):
             print(f"Processing {date} ({i+1}/{len(dates)})")
 
-            self.run_date(date, write_output=write_output)
+            self.run_date(date, "", "")

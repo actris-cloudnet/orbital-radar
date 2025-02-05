@@ -22,7 +22,7 @@ import pandas as pd
 import xarray as xr
 from scipy.interpolate import interp1d
 
-from orbital_radar.readers.cloudnet import read_cloudnet
+from orbital_radar.readers.cloudnet import read_cloudnet_attenuation_file
 
 
 class Radar:
@@ -46,7 +46,14 @@ class Radar:
     - cloudnet: cloudnet format
     """
 
-    def __init__(self, date, site_name, path, input_radar_format) -> None:
+    def __init__(
+        self,
+        date,
+        site_name: str,
+        radar_filepath: str,
+        input_radar_format: str,
+        categorize_filepath: str | None = None,
+    ) -> None:
         """
         Reads hourly radar data for a specific site and date with these
         standardized output variables:
@@ -74,7 +81,8 @@ class Radar:
 
         self.date = pd.Timestamp(date)
         self.site_name = site_name
-        self.path = path
+        self.radar_filepath = radar_filepath
+        self.categorize_filepath = categorize_filepath
         self.make_date_path()
         self.ds_rad = xr.Dataset()
 
@@ -148,21 +156,21 @@ class Radar:
         """
 
         date_path = os.path.join(
-            self.path,
+            self.radar_filepath,
             self.date.strftime(r"%Y"),
             self.date.strftime(r"%m"),
             self.date.strftime(r"%d"),
         )
 
         if os.path.exists(date_path):
-            self.path = date_path
+            self.radar_filepath = date_path
 
-        elif os.path.exists(self.path):
+        elif os.path.exists(self.radar_filepath):
             pass  # use regular path without date extension
 
         else:
             raise FileNotFoundError(
-                f"The radar data path {self.path} does not exist"
+                f"The radar data path {self.radar_filepath} does not exist"
             )
 
     def get_all_files(self, pattern):
@@ -180,7 +188,7 @@ class Radar:
             list of all files inside the directory
         """
 
-        pattern_path = os.path.join(self.path, pattern)
+        pattern_path = os.path.join(self.radar_filepath, pattern)
         files = sorted(glob(pattern_path))
 
         if len(files) == 0:
@@ -579,12 +587,9 @@ class Radar:
         Note: Cloudnet height is already in height above mean sea level.
         """
 
-        ds = read_cloudnet(
-            attenuation_correction_input="cloudnet_categorize",
+        ds = read_cloudnet_attenuation_file(
+            filepath=self.categorize_filepath,
             date=self.date,
-            site_name=self.site_name,
-            path=self.path,
-            add_date=False,
         )
 
         ds = ds.rename({"Z": "ze", "v": "vm"})

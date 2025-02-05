@@ -124,7 +124,7 @@ def main():
     )
 
     if args.date is not None:
-        sub.run_date(args.date)
+        sub.run_date(args.date, "", "")
 
     else:
         sub.run(start_date=args.start_date, end_date=args.end_date)
