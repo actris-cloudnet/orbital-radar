@@ -11,28 +11,27 @@ authors = [
   {name = "Pavlos Kollias"},
   {name = "Bernat Puigdomenech Treserras"}
 ]
-description = "This repository contains the sub-orbital to orbital transformation tool for radar observations, enabling the conversion of radar data from ground or aircraft perspectives to the satellite viewpoint."
+description = "Cloudnet-specific fork of the orbital-radar package."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent"
 ]
 dependencies = [
-  "dask >= 2023.1.0",
-  "matplotlib >= 3.7.0",
-  "netCDF4 >= 1.6.2",
-  "numpy >= 1.25.0",
-  "pandas >= 2.0.0",
-  "scipy >= 1.10.0",
-  "toml >= 0.10.2",
-  "xarray >= 2023.01.0"
+  "dask",
+  "netCDF4",
+  "numpy",
+  "pandas",
+  "scipy",
+  "xarray",
+  "matplotlib"
 ]
 
 [project.optional-dependencies]
-test = ["mypy", "pytest", "ruff", "types-toml"]
-dev = ["numpydoc", "pre-commit"]
+test = ["mypy", "pytest", "ruff"]
+dev = ["numpydoc", "pre-commit", "matplotlib"]
 
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
