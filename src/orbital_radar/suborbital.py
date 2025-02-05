@@ -12,9 +12,9 @@ height above ground for groundbased
 - lat/lon coordinates included as input to airborne radar
 """
 
-import os
 import pathlib
 
+import netCDF4
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -65,10 +65,6 @@ class Suborbital(Simulator):
         else:
             file_path = pathlib.Path(__file__).parent.absolute()
             self.config = read_config(file_path / "orbital_radar_config.toml")
-
-        # TODO: read these from radar file or add parameter
-        self.frequency = 94
-        self.radar_k2 = 0.86
 
         # preparation of input radar data
         self.prepare = self.config["prepare"]["general"]
@@ -175,7 +171,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def correct_dielectric_constant(self, ds):
+    def correct_dielectric_constant(self, ds: xr.Dataset, radar_k2: float):
         r"""
         Apply correction for dielectric constant assumed in Ze calculation
         of suborbital radar to match the dielectric constant of the
@@ -193,7 +189,7 @@ class Suborbital(Simulator):
             Data with "ze" variable.
         """
 
-        correction = self.config["spaceborne_radar"]["k2"] / self.radar_k2
+        correction = self.config["spaceborne_radar"]["k2"] / radar_k2
 
         ds["ze"] = db2li(li2db(ds["ze"]) + 10 * np.log10(correction))
 
@@ -557,7 +553,8 @@ class Suborbital(Simulator):
 
         write_spaceview(ds=self.ds[output_variables], filename=output_filepath)
 
-    def add_attenuation(self, ds, da_gas_atten):
+    @staticmethod
+    def add_attenuation(ds: xr.Dataset, attenuation: xr.DataArray):
         """
         Add attenuation to dataset.
 
@@ -565,8 +562,8 @@ class Suborbital(Simulator):
         ----------
         ds : xarray.Dataset
             Data with "ze" variable. Unit: mm6 m-3
-        da_gas_atten : xarray.DataArray
-            Interpolated gas attenuation data on the same grid as ds.
+        attenuation : xarray.DataArray
+            Interpolated attenuation data on the same grid as ds.
             Unit: dBZ.
 
         Returns
@@ -576,28 +573,13 @@ class Suborbital(Simulator):
         """
 
         # add attenuation in dB and convert back to
-        ds["ze"] = db2li(li2db(ds["ze"]) + da_gas_atten)
+        ds["ze"] = db2li(li2db(ds["ze"]) + attenuation)
 
         return ds
 
-    def attenuation_correction(self, ds, ds_cloudnet):
+    def attenuation_correction(self, ds: xr.Dataset, ds_cloudnet: xr.Dataset):
         """
-        Gas attenuation correction based on Cloudnet.
-
-        Cloudnet contains gas attenuation (gas_atten) as a function of 137
-        ERA5 levels. The height of each level varies with time. Therefore,
-        the height is first interpolated onto the height grid of the radar
-        data. Then, the gas attenuation is interpolated onto the time and
-        height grid of the radar data. Finally, the gas attenuation is added
-        to the radar reflectivity.
-
-        There are major differences between the cloudnet_ecmwf and
-        cloudnet_categorize attenuation products:
-        - ecmwf height is time-dependent, categorize height is not
-        - ecmwf height is wrt ground, categorize height is wrt mean sea level
-        - ecmwf variable is named "radar_gas_atten", categorize variable is
-        named "gas_atten"
-        - ecmwf is calculated for both frequencies, categorize only for 94 GHz
+        Gas attenuation correction based on Cloudnet categorize file.
 
         Parameters
         ----------
@@ -612,69 +594,29 @@ class Suborbital(Simulator):
             Data with added attenuation.
         """
 
-        # select 94 GHz frequency
-        if "frequency" in list(ds_cloudnet.dims):
-            ds_cloudnet = ds_cloudnet.sel(frequency=94, method="nearest")
-
-        if self.prepare["attenuation_correction_input"] == "cloudnet_ecmwf":
-            lst_da_gas_atten = []
-            for time in ds_cloudnet.time:
-                # interpolate gas attenuation to radar height grid
-                ds_cloudnet_t = ds_cloudnet.sel(time=time).swap_dims(
-                    {"level": "height"}
-                )
-
-                da_cloudnet_gas_atten_t = ds_cloudnet_t.gas_atten.interp(
-                    height=ds.height, method="linear"
-                )
-
-                lst_da_gas_atten.append(da_cloudnet_gas_atten_t)
-
-            # merge all time steps
-            da_gas_atten = xr.concat(lst_da_gas_atten, dim="time")
-
-            # drop levels
-            da_gas_atten = da_gas_atten.reset_coords(drop=True)
-
-        elif (
-            self.prepare["attenuation_correction_input"]
-            == "cloudnet_categorize"
-        ):
-            # rename to match ecmwf variable
-            ds_cloudnet = ds_cloudnet.rename({"radar_gas_atten": "gas_atten"})
-
-            # interpolate to radar height grid
-            da_gas_atten = ds_cloudnet.gas_atten.interp(
-                height=ds.height, method="linear"
-            )
-
-        else:
-            raise ValueError(
-                f"Attenuation correction input "
-                f"{self.prepare['attenuation_correction_input']} not "
-                f"implemented"
-            )
+        # interpolate to radar height grid
+        gas_atten = ds_cloudnet.radar_gas_atten.interp(
+            height=ds.height, method="linear"
+        )
 
         # interpolate to radar time grid and extrapolate if needed
-        da_gas_atten = da_gas_atten.interp(
+        gas_atten = gas_atten.interp(
             time=ds.time, method="linear", kwargs={"fill_value": "extrapolate"}
         )
 
         # ensures every time step contains attenuation in range column
-        has_atten = ~da_gas_atten.isnull().all("height")
-        assert (
-            has_atten.all()
-        ), f"Attenuation missing for times: {da_gas_atten.time[~has_atten]}"
+        has_atten = ~gas_atten.isnull().all("height")
+        assert has_atten.all()
 
         # fill nan values with zero
-        da_gas_atten = da_gas_atten.fillna(0)
+        gas_atten = gas_atten.fillna(0)
 
         # apply attenuation correction
-        ds = self.add_attenuation(ds=ds, da_gas_atten=da_gas_atten)
+        ds = self.add_attenuation(ds=ds, attenuation=gas_atten)
 
         return ds
 
-    def run_date(
+    def simulate_cloudnet(
         self,
         date,
         radar_filepath: str,
@@ -699,57 +641,33 @@ class Suborbital(Simulator):
             categorize_filepath=categorize_filepath,
         )
 
-        # read cloudnet data
-        if self.geometry == "groundbased":
-            ds_cloudnet = xr.open_dataset(categorize_filepath)
+        ds_categorize = xr.open_dataset(categorize_filepath)
 
-        # frequency conversion
-        if self.frequency == 35:
+        with netCDF4.Dataset(radar_filepath) as nc:
+            frequency = nc.variables["radar_frequency"][:]
+
+        if frequency == 35:
             radar.ds_rad = self.convert_frequency(radar.ds_rad)
 
-        # correct dielectric constant
-        if self.frequency == 94:
-            radar.ds_rad = self.correct_dielectric_constant(radar.ds_rad)
-
-        # range to height
-        self.check_is_sea_level(radar.ds_rad)
-
-        if (self.geometry == "groundbased") and not self.is_sea_level:
-            print("Converting radar range grid to height above mean sea level")
-            radar.ds_rad = self.range_to_height(radar.ds_rad)
-        else:
-            print(
-                "Assume that input radar grid is defined as height above mean "
-                "sea level"
+        if frequency == 94:
+            radar.ds_rad = self.correct_dielectric_constant(
+                radar.ds_rad, radar_k2=0.86
             )
 
-        # create along track dimension
         radar.ds_rad = self.create_along_track(ds=radar.ds_rad)
 
-        # interpolate to regular grid
         ds = self.interpolate_to_regular_grid(radar.ds_rad)
 
-        if self.geometry == "groundbased":
-            # attenuation correction
-            # no attenuation correction with 35 GHz radar reflectivity
-            if self.frequency == 35:
-                self.prepare["attenuation_correction"] = False
+        # TODO: Check this. Cloudnet categorize is already corrected
+        # so we might not need to do this step?
+        ds = self.attenuation_correction(ds, ds_categorize)
 
-            if self.prepare["attenuation_correction"]:
-                ds = self.attenuation_correction(ds, ds_cloudnet)
-
-            # add ground echo
-            ds = self.add_ground_echo(ds)
+        ds = self.add_ground_echo(ds)
 
         # run simulator
         self.transform(ds)
 
-        # add horizontal wind variable
-        if self.geometry == "groundbased":
-            self.add_groundbased_variables()
-
-        if self.geometry == "airborne":
-            self.add_airborne_variables()
+        self.add_groundbased_variables()
 
         self.to_netcdf(output_filepath)
 
@@ -769,4 +687,4 @@ class Suborbital(Simulator):
 
         for i, date in enumerate(dates):
             print(f"Processing {date} ({i+1}/{len(dates)})")
-            self.run_date(date, "", "", "")
+            self.simulate_cloudnet(date, "", "", "")

@@ -6,8 +6,6 @@
 mean_flight_velocity = 60
 
 [prepare.general]
-attenuation_correction = true
-attenuation_correction_input = 'cloudnet_categorize'
 height_min = -2500
 height_max = 17500
 height_res = 10

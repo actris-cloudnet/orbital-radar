@@ -18,7 +18,7 @@ sub = ora.Suborbital(
     input_radar_format="geoms",
 )
 
-sub.run_date(date="2022-02-14", write_output=False)
+sub.simulate_cloudnet(date="2022-02-14", write_output=False)
 
 
 class TestPlot:

@@ -19,7 +19,7 @@ class TestSuborbital:
             input_radar_format="geoms",
         )
 
-        sub.run_date(date="2022-02-14")
+        sub.simulate_cloudnet(date="2022-02-14")
 
         assert sub.ds is not None
         assert "ze" in sub.ds.data_vars
@@ -37,7 +37,7 @@ class TestSuborbital:
             input_radar_format="cloudnet",
         )
 
-        sub.run_date(date="2021-04-01")
+        sub.simulate_cloudnet(date="2021-04-01")
 
         assert sub.ds is not None
         assert "ze" in sub.ds.data_vars
@@ -57,7 +57,7 @@ class TestSuborbital:
             input_radar_format="arm",
         )
 
-        sub.run_date(date="2009-11-13")
+        sub.simulate_cloudnet(date="2009-11-13")
 
         assert sub.ds is not None
         assert "ze" in sub.ds.data_vars
@@ -75,7 +75,7 @@ class TestSuborbital:
             input_radar_format="mirac_p5",
         )
 
-        sub.run_date(date="2019-04-01")
+        sub.simulate_cloudnet(date="2019-04-01")
 
         assert sub.ds is not None
         assert "ze" in sub.ds.data_vars
@@ -94,7 +94,7 @@ class TestSuborbital:
             input_radar_format="rasta",
         )
 
-        sub.run_date(date="2022-08-06")
+        sub.simulate_cloudnet(date="2022-08-06")
 
         assert sub.ds is not None
         assert "ze" in sub.ds.data_vars
@@ -113,7 +113,7 @@ class TestSuborbital:
             input_radar_format="pamtra",
         )
 
-        sub.run_date(date="2022-01-13")
+        sub.simulate_cloudnet(date="2022-01-13")
 
         assert sub.ds is not None
         assert "ze" in sub.ds.data_vars
