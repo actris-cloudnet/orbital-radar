@@ -21,7 +21,6 @@ import xarray as xr
 
 from orbital_radar.helpers import db2li, li2db
 from orbital_radar.radarspec import RadarBeam
-from orbital_radar.readers.cloudnet import read_cloudnet_attenuation_file
 from orbital_radar.readers.config import read_config
 from orbital_radar.readers.radar import Radar
 from orbital_radar.simulator import Simulator
@@ -700,20 +699,9 @@ class Suborbital(Simulator):
             categorize_filepath=categorize_filepath,
         )
 
-        # skip if radar data does not exist
-        if radar.ds_rad is None:
-            print(f"{date}: No radar data found")
-            return
-
         # read cloudnet data
         if self.geometry == "groundbased":
-            ds_cloudnet = read_cloudnet_attenuation_file(
-                filepath=categorize_filepath,
-                date=date,
-            )
-
-            if ds_cloudnet is None:
-                self.prepare["attenuation_correction"] = False
+            ds_cloudnet = xr.open_dataset(categorize_filepath)
 
         # frequency conversion
         if self.frequency == 35:

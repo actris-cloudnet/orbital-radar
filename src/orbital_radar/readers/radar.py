@@ -22,8 +22,6 @@ import pandas as pd
 import xarray as xr
 from scipy.interpolate import interp1d
 
-from orbital_radar.readers.cloudnet import read_cloudnet_attenuation_file
-
 
 class Radar:
     """
@@ -583,10 +581,10 @@ class Radar:
         Note: Cloudnet height is already in height above mean sea level.
         """
 
-        ds = read_cloudnet_attenuation_file(
-            filepath=self.categorize_filepath,
-            date=self.date,
-        )
+        if self.categorize_filepath is None:
+            raise FileNotFoundError("No categorize file found.")
+
+        ds = xr.open_dataset(self.categorize_filepath)
 
         ds = ds.rename({"Z": "ze", "v": "vm"})
         ds = self.remove_duplicate_times(ds)
