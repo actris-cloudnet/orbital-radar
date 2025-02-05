@@ -35,7 +35,6 @@ class Suborbital(Simulator):
         self,
         geometry: str = "groundbased",
         input_radar_format: str = "cloudnet",
-        config_file: str | None = None,
     ):
         """
         Initialize the simulator for suborbital radar data.
@@ -51,26 +50,70 @@ class Suborbital(Simulator):
             parameters and directory paths.
         """
 
-        # set class attributes
         self.geometry = geometry
         self.input_radar_format = input_radar_format
 
-        if config_file:
-            self.config = read_config(config_file)
-        else:
-            file_path = pathlib.Path(__file__).parent.absolute()
-            self.config = read_config(file_path / "orbital_radar_config.toml")
+        # Read config file
+        file_path = pathlib.Path(__file__).parent.absolute()
+        self.config = read_config(file_path / "orbital_radar_config.toml")
 
-        # preparation of input radar data
         self.prepare = self.config["prepare"]["general"]
-        self.prepare.update(self.config["prepare"][self.geometry])
 
         file_path = pathlib.Path(__file__).parent.absolute()
         cpr_file = file_path / "data/CPR_PointTargetResponse.txt"
 
         super().__init__(file_earthcare=cpr_file)
 
-    def convert_frequency(self, ds: xr.Dataset):
+    def simulate_cloudnet(
+        self,
+        categorize_filepath: str,
+        output_filepath: str,
+        mean_wind: float,
+    ):
+        """
+        Runs simulation for a single day.
+
+        Parameters
+        ----------
+        date : np.datetime64
+            Date to simulate.
+        write_output : bool
+            If True, write output to netcdf file.
+        mean_wind : float
+            Mean wind speed in m/s.
+        """
+
+        radar = Radar(categorize_filepath)
+
+        with xr.open_dataset(categorize_filepath) as ds_categorize:
+            frequency = ds_categorize.radar_frequency.item()
+
+            if np.isclose(frequency, 35, atol=1):
+                radar.ds_rad = self._convert_frequency(radar.ds_rad)
+            elif np.isclose(frequency, 94, atol=1):
+                radar.ds_rad = self._correct_dielectric_constant(
+                    radar.ds_rad, satellite_k2=0.75, radar_k2=0.86
+                )
+            else:
+                raise NotImplementedError("Frequency not supported")
+
+            radar.ds_rad = self._create_along_track(radar.ds_rad, mean_wind)
+
+            ds = self._interpolate_to_regular_grid(radar.ds_rad)
+
+            # TODO: Check this. Cloudnet categorize is already attenuation corrected?
+            ds = self._apply_gas_attenuation(ds, ds_categorize)
+
+        ds = self._add_ground_echo(ds)
+
+        # run simulator
+        self.transform(ds)
+
+        self._add_ground_based_variables(mean_wind)
+
+        self._to_netcdf(output_filepath)
+
+    def _convert_frequency(self, ds: xr.Dataset):
         """
         Convert frequency from 35 to 94 GHz.
 
@@ -104,7 +147,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def correct_dielectric_constant(
+    def _correct_dielectric_constant(
         self, ds: xr.Dataset, satellite_k2: float, radar_k2: float
     ):
         r"""
@@ -134,7 +177,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def add_vmze_attrs(self, ds):
+    def _add_vmze_attrs(self, ds):
         """
         Adds attributes to Doppler velocity and radar reflectivity variables.
 
@@ -165,30 +208,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def range_to_height(self, ds):
-        """
-        Convert range coordinate to height coordinate by adding the station
-        height above mean sea level to the range coordinate.
-
-        The altitude is pre-defined for each station in the configuration file.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "range" coordinate.
-        """
-
-        ds["height"] = ds["range"] + ds.alt.item()
-
-        # swap range with height
-        ds = ds.swap_dims({"range": "height"})
-
-        # drop range coordinate
-        ds = ds.reset_coords(drop=True)
-
-        return ds
-
-    def create_along_track(self, ds):
+    def _create_along_track(self, ds, mean_wind: float):
         """
         Creates along-track coordinates from time coordinates.
 
@@ -203,25 +223,10 @@ class Suborbital(Simulator):
             Data with "along_track" coordinate.
         """
 
-        if self.geometry == "groundbased":
-            # print("Using mean wind for along-track coordinates")
-            v = self.prepare["mean_wind"]
-
-        elif self.geometry == "airborne" and "ac_speed" in list(ds):
-            # print("Using flight velocity for along-track coordinates")
-            v = ds.ac_speed.values
-
-        elif self.geometry == "airborne" and "ac_speed" not in list(ds):
-            # print("Using mean flight velocity for along-track coordinates")
-            v = self.prepare["mean_flight_velocity"]
-
-        else:
-            raise ValueError
-
         # calculate the along-track distance
         dt = ds.time.diff("time") / np.timedelta64(1, "s")
         dt = xr.align(ds.time, dt, join="outer")[1].fillna(0)  # start is dt=0
-        arr_along_track = np.cumsum(v * dt)
+        arr_along_track = np.cumsum(mean_wind * dt)
 
         da_along_track = xr.DataArray(
             arr_along_track, dims="time", coords=[ds.time], name="along_track"
@@ -242,7 +247,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def create_regular_height(self):
+    def _create_regular_height(self):
         """
         Creates regular height coordinate for suborbital radar.
 
@@ -270,7 +275,7 @@ class Suborbital(Simulator):
 
         return da_height_regular
 
-    def create_regular_along_track(self, ds):
+    def _create_regular_along_track(self, ds):
         """
         Creates regular along-track coordinate for suborbital radar.
 
@@ -305,7 +310,7 @@ class Suborbital(Simulator):
 
         return da_along_track_regular
 
-    def interpolate_to_regular_grid(self, ds):
+    def _interpolate_to_regular_grid(self, ds):
         """
         Interpolates radar data to regular grid in along-track and height.
 
@@ -320,8 +325,8 @@ class Suborbital(Simulator):
             Data with interpolated "along_track" and "height" coordinates.
         """
 
-        da_height_regular = self.create_regular_height()
-        da_along_track_regular = self.create_regular_along_track(ds=ds)
+        da_height_regular = self._create_regular_height()
+        da_along_track_regular = self._create_regular_along_track(ds=ds)
 
         # interpolation along-track and height
         # workaround for time: convert to seconds since start, then
@@ -339,11 +344,11 @@ class Suborbital(Simulator):
         )
 
         # add attributes
-        ds = self.add_vmze_attrs(ds)
+        ds = self._add_vmze_attrs(ds)
 
         return ds
 
-    def add_ground_echo(self, ds):
+    def _add_ground_echo(self, ds):
         """
         Calculates artificial ground echo inside ground-based radar range
         grid. The values are chosen such that the final ground echo after
@@ -407,14 +412,14 @@ class Suborbital(Simulator):
 
         return ds
 
-    def add_groundbased_variables(self):
+    def _add_ground_based_variables(self, mean_wind: float):
         """
         Add variables specific to groundbased simulator to the dataset, i.e.,
         the mean horizontal wind.
         """
 
         self.ds["mean_wind"] = xr.DataArray(
-            self.prepare["mean_wind"],
+            mean_wind,
             attrs=dict(
                 standard_name="v_hor",
                 long_name="Mean horizontal wind",
@@ -423,7 +428,7 @@ class Suborbital(Simulator):
             ),
         )
 
-    def to_netcdf(self, output_filepath: str):
+    def _to_netcdf(self, output_filepath: str):
         """
         Writes dataset to netcdf file. Note that not all variables are stored.
 
@@ -462,31 +467,7 @@ class Suborbital(Simulator):
         )
         logging.info(f"Written file: {output_filepath}")
 
-    @staticmethod
-    def add_attenuation(ds: xr.Dataset, attenuation: xr.DataArray):
-        """
-        Add attenuation to dataset.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data with "ze" variable. Unit: mm6 m-3
-        attenuation : xarray.DataArray
-            Interpolated attenuation data on the same grid as ds.
-            Unit: dBZ.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Data with added attenuation.
-        """
-
-        # add attenuation in dB and convert back to
-        ds["ze"] = db2li(li2db(ds["ze"]) + attenuation)
-
-        return ds
-
-    def attenuation_correction(self, ds: xr.Dataset, ds_cloudnet: xr.Dataset):
+    def _apply_gas_attenuation(self, ds: xr.Dataset, ds_cloudnet: xr.Dataset):
         """
         Gas attenuation correction based on Cloudnet categorize file.
 
@@ -521,52 +502,6 @@ class Suborbital(Simulator):
         gas_atten = gas_atten.fillna(0)
 
         # apply attenuation correction
-        ds = self.add_attenuation(ds=ds, attenuation=gas_atten)
+        ds["ze"] = db2li(li2db(ds["ze"]) + gas_atten)
 
         return ds
-
-    def simulate_cloudnet(
-        self,
-        categorize_filepath: str,
-        output_filepath: str,
-    ):
-        """
-        Runs simulation for a single day.
-
-        Parameters
-        ----------
-        date : np.datetime64
-            Date to simulate.
-        write_output : bool
-            If True, write output to netcdf file.
-        """
-
-        radar = Radar(categorize_filepath)
-
-        with xr.open_dataset(categorize_filepath) as ds_categorize:
-            frequency = ds_categorize.radar_frequency.item()
-
-            if np.isclose(frequency, 35, atol=1):
-                radar.ds_rad = self.convert_frequency(radar.ds_rad)
-            elif np.isclose(frequency, 94, atol=1):
-                radar.ds_rad = self.correct_dielectric_constant(
-                    radar.ds_rad, satellite_k2=0.75, radar_k2=0.86
-                )
-            else:
-                raise NotImplementedError("Frequency not supported")
-
-            radar.ds_rad = self.create_along_track(ds=radar.ds_rad)
-
-            ds = self.interpolate_to_regular_grid(radar.ds_rad)
-
-            # TODO: Check this. Cloudnet categorize is already attenuation corrected?
-            ds = self.attenuation_correction(ds, ds_categorize)
-
-        ds = self.add_ground_echo(ds)
-
-        # run simulator
-        self.transform(ds)
-
-        self.add_groundbased_variables()
-
-        self.to_netcdf(output_filepath)

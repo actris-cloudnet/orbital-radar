@@ -77,7 +77,51 @@ class Simulator:
             **self.radar_specs,
         )
 
-    def check_input_dataset(self):
+    def transform(self, ds: xr.Dataset):
+        """
+        Runs the entire simulator.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Data from suborbital radar interpolated to "along_track" [m] and
+            "height" [m] coordinates. The dataset must contain the following
+            variables:
+            Radar reflectivity "ze" [mm6 m-3],
+            Doppler velocity "vm" [m s-1].
+            Both variables should have no nan values. Any nan's should be
+            filled with zeros.
+        """
+
+        self.ds = ds
+        self._check_input_dataset()
+        self._prepare_input_dataset()
+
+        self.beam.calculate_weighting_functions(
+            range_coords=self.ds["height"],
+            along_track_coords=self.ds["along_track"],
+        )
+
+        self._apply_detection_limit(var_ze="ze", var_other=["ze", "vm"])
+
+        self._convolve_along_track()
+        self._integrate_along_track()
+        self._convolve_height()
+        self._apply_detection_limit(
+            var_ze="ze_sat", var_other=["ze_sat", "vm_sat", "vm_sat_vel"]
+        )
+        self._calculate_ze_noise()
+        self._calculate_vm_noise()
+        self._fold_vm()
+        self._calculate_nubf()
+        self._calculate_nubf_flag()
+        self._calculate_vm_bias()
+        self._calculate_vm_bias_flag()
+        self._calculate_ms_flag()
+        self._calculate_signal_fraction()
+        self._add_attributes()
+
+    def _check_input_dataset(self):
         """
         Check user input for consistency.
         """
@@ -113,7 +157,7 @@ class Simulator:
             f"{self.ds['height'].diff('height')[0]} m"
         )
 
-    def prepare_input_dataset(self):
+    def _prepare_input_dataset(self):
         """
         Prepares input dataset for computations. This only includes replacing
         nan values by zero in both ze and vm.
@@ -155,7 +199,7 @@ class Simulator:
 
         return height_sat_bin_edges
 
-    def convolve_along_track(self):
+    def _convolve_along_track(self):
         """
         Calculates the along-track convolution from the input suborbital data
         using the along-track weighting function of the spaceborne radar.
@@ -185,7 +229,7 @@ class Simulator:
         self.ds["vm_acon"] = ds["vm"].dot(weight).compute()
         self.ds["vm_acon_err"] = ds["vm_err"].dot(weight).compute()
 
-    def integrate_along_track(self):
+    def _integrate_along_track(self):
         """
         Integrates the along-track convoluted data to profiles, which represent
         the satellite's footprint. The along-track integration is given by the
@@ -224,7 +268,7 @@ class Simulator:
         # rename along-track dimension
         self.ds = self.ds.rename({"along_track_bins": "along_track_sat"})
 
-    def convolve_height(self):
+    def _convolve_height(self):
         """
         Convolution of the along-track integrated data with the range
         weighting function of the spaceborne radar.
@@ -272,7 +316,7 @@ class Simulator:
         self.ds["vm_sat_vel"] = numerator_vm_sat_vel / denominator_vm_sat_vel
         self.ds["vm_sat_vel"] = self.ds["vm_sat_vel"].where(denominator_vm_sat_vel != 0, 0)
 
-    def calculate_nubf(self):
+    def _calculate_nubf(self):
         r"""
         Calculates the non-uniform beam filling from the standard
         deviation of Ze within the radar volume.
@@ -335,7 +379,7 @@ class Simulator:
             },
         )
 
-    def calculate_nubf_flag(self, threshold=1):
+    def _calculate_nubf_flag(self, threshold=1):
         """
         Calculate non-uniform beam filling flag. The flag is 1 if the
         non-uniform beam filling is higher than a certain threshold, and 0
@@ -349,7 +393,7 @@ class Simulator:
 
         self.ds["nubf_flag"] = (self.ds["nubf"] > threshold).astype("int")
 
-    def calculate_vm_bias(self):
+    def _calculate_vm_bias(self):
         """
         Calculate the satellite Doppler velocity bias between the estimate
         with and without satellite motion error.
@@ -357,7 +401,7 @@ class Simulator:
 
         self.ds["vm_bias"] = self.ds["vm_sat"] - self.ds["vm_sat_vel"]
 
-    def calculate_vm_bias_flag(self, threshold=0.5):
+    def _calculate_vm_bias_flag(self, threshold=0.5):
         """
         Calculate the satellite Doppler velocity bias flag. The flag is 1 if
         the absolute satellite Doppler velocity bias is higher than 0.5 m s-1,
@@ -374,7 +418,7 @@ class Simulator:
             np.abs(self.ds["vm_bias"]) > threshold
         ).astype("int")
 
-    def calculate_signal_fraction(self):
+    def _calculate_signal_fraction(self):
         """
         Calculates the fraction of bins that contain a ze signal above the
         detection limit of the spaceborne radar. The fraction is 1 if all
@@ -408,7 +452,7 @@ class Simulator:
             .mean()
         ).rename({"height_bins": "height_sat"})
 
-    def calculate_ms_flag(self):
+    def _calculate_ms_flag(self):
         """
         Calculates the multiple scattering flag. The flag is 1 if multiple
         scattering occurs, and 0 if no multiple scattering occurs.
@@ -444,7 +488,7 @@ class Simulator:
         )
         self.ds["ms_flag"].loc[{"height_sat": subsurface}] = 0
 
-    def apply_detection_limit(self, var_ze, var_other: list):
+    def _apply_detection_limit(self, var_ze, var_other: list):
         """
         Applies the detection limit of the spaceborne radar to the along-height
         convoluted data.
@@ -563,7 +607,7 @@ class Simulator:
 
         return vm_std
 
-    def calculate_ze_noise(self):
+    def _calculate_ze_noise(self):
         """
         Adds noise to satellite radar reflectivity based on the pre-defined
         lookup table with noise values for different radar reflectivity bins.
@@ -603,7 +647,7 @@ class Simulator:
             )
         )
 
-    def calculate_vm_noise(self):
+    def _calculate_vm_noise(self):
         """
         Adds noise to satellite Doppler velocity based on the pre-defined
         lookup table with noise values for different radar reflectivity bins.
@@ -653,7 +697,7 @@ class Simulator:
             x=self.ds["vm_sat_vel"], x_std=vm_std, noise=noise
         )
 
-    def fold_vm(self):
+    def _fold_vm(self):
         """
         Doppler velocity folding correction.
         """
@@ -717,7 +761,7 @@ class Simulator:
             f'{self.ds["vm_sat_folded"].max()}'
         )
 
-    def add_attributes(self):
+    def _add_attributes(self):
         """
         Adds attributes to the variables of the dataset
         """
@@ -997,96 +1041,3 @@ class Simulator:
         fig = plot_scatter(ds=self.ds, **kwds)
 
         return fig
-
-    def transform(self, ds):
-        """
-        Runs the entire simulator.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Data from suborbital radar interpolated to "along_track" [m] and
-            "height" [m] coordinates. The dataset must contain the following
-            variables:
-            Radar reflectivity "ze" [mm6 m-3],
-            Doppler velocity "vm" [m s-1].
-            Both variables should have no nan values. Any nan's should be
-            filled with zeros.
-        """
-
-        # add input dataset to class
-        self.ds = ds
-
-        # check input dataset for consistency
-        # print("Check input dataset")
-        self.check_input_dataset()
-
-        # prepare input dataset for computations
-        # print("Prepare input dataset")
-        self.prepare_input_dataset()
-
-        # compute weighting functions
-        # print("Compute weighting functions")
-        self.beam.calculate_weighting_functions(
-            range_coords=self.ds["height"],
-            along_track_coords=self.ds["along_track"],
-        )
-
-        # detection limit
-        # print("Apply detection limit to input data")
-        self.apply_detection_limit(var_ze="ze", var_other=["ze", "vm"])
-
-        # transformations to spaceborne radar
-        # print("Convolve along track")
-        self.convolve_along_track()
-
-        # print("Integrate along track")
-        self.integrate_along_track()
-
-        # print("Convolve height")
-        self.convolve_height()
-
-        # detection limit
-        # print("Apply detection limit on satellite view")
-        self.apply_detection_limit(
-            var_ze="ze_sat", var_other=["ze_sat", "vm_sat", "vm_sat_vel"]
-        )
-
-        # noise
-        # print("Calculate Ze noise")
-        self.calculate_ze_noise()
-
-        # print("Calculate Vm noise")
-        self.calculate_vm_noise()
-
-        # doppler velocity folding
-        # print("Fold Vm")
-        self.fold_vm()
-
-        # non-uniform beam filling
-        # print("Calculate non-uniform beam filling")
-        self.calculate_nubf()
-
-        # non-uniform beam filling flag
-        # print("Calculate non-uniform beam filling flag")
-        self.calculate_nubf_flag()
-
-        # doppler velocity bias
-        # print("Calculate Doppler velocity bias")
-        self.calculate_vm_bias()
-
-        # doppler velocity bias flag
-        # print("Calculate Doppler velocity bias flag")
-        self.calculate_vm_bias_flag()
-
-        # multiple scattering flag
-        # print("Calculate multiple scattering flag")
-        self.calculate_ms_flag()
-
-        # signal fraction
-        # print("Calculate signal fraction")
-        self.calculate_signal_fraction()
-
-        # set attributes
-        # print("Add attributes")
-        self.add_attributes()
