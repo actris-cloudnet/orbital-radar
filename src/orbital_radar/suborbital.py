@@ -36,28 +36,23 @@ class Suborbital(Simulator):
 
     def __init__(
         self,
-        config_file: str,
         geometry: str = "groundbased",
         input_radar_format: str = "cloudnet",
+        config_file: str | None = None,
     ):
         """
         Initialize the simulator for suborbital radar data.
 
         Parameters
         ----------
-        config_file : str
-            Path to the configuration file that contains the site-dependent
-            parameters and directory paths.
         geometry : str
             Observation geometry of radar (groundbased or airborne).
         input_radar_format : str
             Format of the input radar data (e.g. cloudnet).
+        config_file : str
+            Path to the configuration file that contains the site-dependent
+            parameters and directory paths.
         """
-
-        if not os.path.isfile(config_file):
-            raise FileNotFoundError(
-                f"Configuration file {config_file} not found"
-            )
 
         # set class attributes
         self.geometry = geometry
@@ -66,8 +61,11 @@ class Suborbital(Simulator):
         # attributes that will be derived
         self.is_sea_level = False
 
-        # read configuration file
-        self.config = read_config(config_file)
+        if config_file:
+            self.config = read_config(config_file)
+        else:
+            file_path = pathlib.Path(__file__).parent.absolute()
+            self.config = read_config(file_path / "orbital_radar_config.toml")
 
         # TODO: read these from radar file or add parameter
         self.frequency = 94

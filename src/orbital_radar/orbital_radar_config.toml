@@ -1,0 +1,25 @@
+# User configurations for orbital-radar
+
+[prepare]
+
+[prepare.airborne]
+mean_flight_velocity = 60
+
+[prepare.general]
+attenuation_correction = true
+attenuation_correction_input = 'cloudnet_categorize'
+height_min = -2500
+height_max = 17500
+height_res = 10
+ground_echo_ze_max = 52
+ground_echo_pulse_length = 100
+
+[prepare.groundbased]
+mean_wind = 6
+
+[spaceborne_radar]
+sat_name = 'earthcare'
+ms_threshold = 12
+ms_threshold_integral = 41
+k2 = 0.75
+nyquist_from_prf = false
