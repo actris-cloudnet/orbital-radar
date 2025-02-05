@@ -13,6 +13,7 @@ height above ground for groundbased
 """
 
 import os
+import pathlib
 
 import numpy as np
 import pandas as pd
@@ -80,9 +81,12 @@ class Suborbital(Simulator):
         self.summary
 
         # initialize simulator class with spaceborne radar settings
+
+        file_path = pathlib.Path(__file__).parent.absolute()
+
         super().__init__(
             sat_name=self.config["spaceborne_radar"]["sat_name"],
-            file_earthcare=self.config["spaceborne_radar"]["file_earthcare"],
+            file_earthcare=file_path / "data/CPR_PointTargetResponse.txt",
             nyquist_from_prf=self.config["spaceborne_radar"][
                 "nyquist_from_prf"
             ],
@@ -90,7 +94,6 @@ class Suborbital(Simulator):
             ms_threshold_integral=self.config["spaceborne_radar"][
                 "ms_threshold_integral"
             ],
-            **self.config["spaceborne_radar"]["radar_specs"],
         )
 
     @property
