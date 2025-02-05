@@ -17,7 +17,7 @@ def db2li(x):
     return 10 ** (0.1 * x)
 
 
-def li2db(x):
+def li2db(x, epsilon=1e-15):
     """
     Conversion from linear to dB.
 
@@ -26,4 +26,4 @@ def li2db(x):
     x : float
         Any value or array to be converted from linear to dB unit
     """
-    return 10 * np.log10(x)
+    return 10 * np.log10(x + epsilon)

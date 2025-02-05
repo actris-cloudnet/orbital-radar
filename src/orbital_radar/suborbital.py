@@ -25,8 +25,6 @@ from orbital_radar.readers.radar import Radar
 from orbital_radar.simulator import Simulator
 from orbital_radar.version import __version__
 
-# from orbital_radar.writers.spaceview import write_spaceview
-
 
 class Suborbital(Simulator):
     """
@@ -451,15 +449,17 @@ class Suborbital(Simulator):
             "nubf_flag",
             "ms_flag",
             "folding_flag",
+            "mean_wind",
         ]
 
-        if self.geometry == "groundbased":
-            output_variables += ["mean_wind"]
-
-        if self.geometry == "airborne":
-            output_variables += ["mean_flight_velocity"]
-
-        self.ds[output_variables].to_netcdf(output_filepath, mode="w")
+        encodings = {
+            "time": {
+                "dtype": "float64",
+            }
+        }
+        self.ds[output_variables].to_netcdf(
+            output_filepath, mode="w", encoding=encodings
+        )
         logging.info(f"Written file: {output_filepath}")
 
     @staticmethod
