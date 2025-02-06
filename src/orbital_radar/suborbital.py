@@ -12,6 +12,7 @@ height above ground for groundbased
 - lat/lon coordinates included as input to airborne radar
 """
 
+import datetime
 import logging
 import pathlib
 import uuid as uuidlib
@@ -20,7 +21,7 @@ import netCDF4
 import numpy as np
 import xarray as xr
 
-from orbital_radar.helpers import db2li, li2db
+from orbital_radar.helpers import db2li, li2db, remove_duplicate_times
 from orbital_radar.radarspec import RadarBeam
 from orbital_radar.readers.config import read_config
 from orbital_radar.readers.radar import Radar
@@ -93,10 +94,13 @@ class Suborbital(Simulator):
 
             if np.isclose(frequency, 35, atol=1):
                 radar.ds_rad = self._convert_frequency(radar.ds_rad)
+
+            # TODO: Check this. Maybe you want to do this every time after frequency conversion?
             elif np.isclose(frequency, 94, atol=1):
                 radar.ds_rad = self._correct_dielectric_constant(
                     radar.ds_rad, satellite_k2=0.75, radar_k2=0.86
                 )
+
             else:
                 raise NotImplementedError("Frequency not supported")
 
@@ -112,12 +116,27 @@ class Suborbital(Simulator):
         # run simulator
         self.transform(ds)
 
+        self.ds = remove_duplicate_times(self.ds)
+
         self._add_ground_based_variables(mean_wind)
 
         self._to_netcdf(output_filepath)
 
+        self._harmonize_for_cloudnet(
+            output_filepath, categorize_filepath, uuid
+        )
+
+        return str(uuid)
+
+    @staticmethod
+    def _harmonize_for_cloudnet(
+        filepath: str, source_filepath: str, uuid: uuidlib.UUID | None = None
+    ):
         # Harmonize netCDF file to be Cloudnet-compatible
-        with netCDF4.Dataset(output_filepath, "r+") as nc:
+        with (
+            netCDF4.Dataset(filepath, "r+") as nc,
+            netCDF4.Dataset(source_filepath, "r") as nc_source,
+        ):
             if uuid is None:
                 uuid = uuidlib.uuid4()
             nc.file_uuid = str(uuid)
@@ -126,15 +145,32 @@ class Suborbital(Simulator):
             time = nc.variables["time"]
             if "nanoseconds" in time.units:
                 time[:] /= 3.6e12
-                date = time.units.split("since")[1].strip()
-                time.units = f"hours since {date} 00:00:00"
+                date = time.units.split("since")[1].split()[0]
+                time.units = f"hours since {date} 00:00:00 +00:00"
             else:
                 raise NotImplementedError("Time units not supported")
 
-            nc.source_file_uuids = ds_categorize.file_uuid
-            nc.cloudnet_file_type = "earthcare"
-
-        return str(uuid)
+            # Global attributes
+            file_type = "earthcare"
+            nc.location = nc_source.location
+            nc.title = f"Simulated EarthCARE radar from {nc_source.location}"
+            nc.source = nc_source.variables["Z"].source
+            nc.source_file_uuids = nc_source.file_uuid
+            nc.cloudnet_file_type = file_type
+            nc.history = (
+                f"{datetime.datetime.now()} - {file_type} file created\n"
+                + nc.history
+            )
+            for attr in (
+                "cloudnetpy_version",
+                "pid",
+                "location",
+                "title",
+                "references",
+                "source",
+            ):
+                if attr in nc.ncattrs():
+                    nc.delncattr(attr)
 
     def _convert_frequency(self, ds: xr.Dataset):
         """
@@ -414,7 +450,7 @@ class Suborbital(Simulator):
         # add ground echo to dataset shifted by one height bin to have maximum
         # below zero
         # get closest height bin to ground
-        idx = (np.abs(ds.height - ds.alt.item())).argmin()
+        idx = (np.abs(ds.height - ds.altitude.item())).argmin()
         base = ds.height[idx].item()
 
         # insert half of the calculated ground echo and shift maximum below the
@@ -444,7 +480,6 @@ class Suborbital(Simulator):
         self.ds["mean_wind"] = xr.DataArray(
             mean_wind,
             attrs=dict(
-                standard_name="v_hor",
                 long_name="Mean horizontal wind",
                 units="m s-1",
                 description="Mean horizontal wind",
@@ -462,33 +497,44 @@ class Suborbital(Simulator):
 
         """
 
-        output_variables = [
-            "sat_ifov",
-            "sat_range_resolution",
-            "sat_along_track_resolution",
-            "ze",
-            "vm",
-            "ze_sat",
-            "vm_sat",
-            "vm_sat_vel",
-            "ze_sat_noise",
-            "vm_sat_noise",
-            "vm_sat_folded",
-            "nubf_flag",
-            "ms_flag",
-            "folding_flag",
-            "mean_wind",
-        ]
-
-        encodings = {
-            "time": {
-                "dtype": "float64",
-            }
+        FLOAT = {
+            "dtype": "float32",
+            "_FillValue": netCDF4.default_fillvals["f4"],
         }
-        self.ds[output_variables].to_netcdf(
-            output_filepath, mode="w", encoding=encodings
+        TIME = {"dtype": "float64", "_FillValue": None}
+        INT = {"dtype": "int32", "_FillValue": netCDF4.default_fillvals["i4"]}
+        FLOAT_SCALAR = {"dtype": "float32", "_FillValue": None}
+
+        variable_map = {
+            "time": TIME,
+            "sat_ifov": FLOAT_SCALAR,
+            "sat_range_resolution": FLOAT_SCALAR,
+            "sat_along_track_resolution": FLOAT_SCALAR,
+            "ze": FLOAT,
+            "vm": FLOAT,
+            "ze_sat": FLOAT,
+            "vm_sat": FLOAT,
+            "vm_sat_vel": FLOAT,
+            "ze_sat_noise": FLOAT,
+            "vm_sat_noise": FLOAT,
+            "vm_sat_folded": FLOAT,
+            "nubf_flag": INT,
+            "ms_flag": INT,
+            "folding_flag": INT,
+            "mean_wind": FLOAT_SCALAR,
+            "latitude": FLOAT_SCALAR,
+            "longitude": FLOAT_SCALAR,
+            "altitude": FLOAT_SCALAR,
+            "along_track": FLOAT,
+            "height_sat": FLOAT_SCALAR,
+            "along_track_sat": FLOAT,
+            "height": FLOAT,
+        }
+
+        self.ds[variable_map.keys()].to_netcdf(  # type: ignore
+            output_filepath, mode="w", encoding=variable_map
         )
-        logging.info(f"Written file: {output_filepath}")
+        logging.debug(f"Written file: {output_filepath}")
 
     def _apply_gas_attenuation(self, ds: xr.Dataset, ds_cloudnet: xr.Dataset):
         """

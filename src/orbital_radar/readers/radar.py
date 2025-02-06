@@ -70,9 +70,6 @@ class Radar:
             self.ds_rad.vm.isnull().all() or self.ds_rad.vm.max() < 80
         ), "Vm values out of range."
 
-        # make sure that alt is in the data
-        assert "alt" in list(self.ds_rad), "Altitude not found."
-
     def read_cloudnet(self) -> xr.Dataset:
         """
         Reads radar reflectivity and Doppler velocity from Cloudnet categorize
@@ -84,13 +81,14 @@ class Radar:
         ds = xr.open_dataset(self.categorize_filepath)
 
         ds = ds.rename({"Z": "ze", "v": "vm"})
+        # ds = self.remove_duplicate_times(ds)
 
         ds_radar = ds[["ze", "vm"]]
 
         # extract instrument location and altitude
-        ds_radar["lon"] = ds["longitude"]
-        ds_radar["lat"] = ds["latitude"]
-        ds_radar["alt"] = ds["altitude"]
+        ds_radar["longitude"] = ds["longitude"]
+        ds_radar["latitude"] = ds["latitude"]
+        ds_radar["altitude"] = ds["altitude"]
 
         # convert from dB to linear units
         ds_radar["ze"] = 10 ** (0.1 * ds_radar["ze"])

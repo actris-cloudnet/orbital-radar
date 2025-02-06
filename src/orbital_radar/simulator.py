@@ -768,14 +768,12 @@ class Simulator:
 
         # overwrite attributes of ze and vm inputs
         self.ds["ze"].attrs = dict(
-            standard_name="radar_reflectivity_factor",
             long_name="Radar reflectivity factor of input",
             units="mm6 m-3",
             description="Radar reflectivity factor of input",
         )
 
         self.ds["vm"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Mean Doppler velocity of input",
             units="m s-1",
             description="Mean Doppler velocity of input",
@@ -783,28 +781,24 @@ class Simulator:
 
         # add attributes to dimensions
         self.ds["along_track"].attrs = dict(
-            standard_name="along_track",
             long_name="Along-track",
             units="m",
             description="Along-track distance",
         )
 
         self.ds["height"].attrs = dict(
-            standard_name="height",
-            long_name="height",
+            standard_name="height_above_mean_sea_level",
+            long_name="Height above mean sea level",
             units="m",
-            description="Height of bin in meters above mean sea level",
         )
 
         self.ds["along_track_sat"].attrs = dict(
-            standard_name="along_track",
             long_name="Along-track",
             units="m",
             description="Along-track distance at satellite resolution",
         )
 
         self.ds["height_sat"].attrs = dict(
-            standard_name="height",
             long_name="height",
             units="m",
             description="Height of bin in meters above mean sea level at "
@@ -813,7 +807,6 @@ class Simulator:
 
         # add attributes to variables
         self.ds["nubf"].attrs = dict(
-            standard_name="non_uniform_beam_filling",
             long_name="Non-uniform beam filling",
             units="dBZ",
             description="Non-uniform beam filling calculated as the standard "
@@ -822,7 +815,6 @@ class Simulator:
         )
 
         self.ds["nubf_flag"].attrs = dict(
-            standard_name="non_uniform_beam_filling_flag",
             long_name="Non-uniform beam filling flag",
             description="Non-uniform beam filling flag. 1 means non-uniform "
             "beam filling is higher than 1 dB, 0 means non-uniform beam "
@@ -830,14 +822,12 @@ class Simulator:
         )
 
         self.ds["signal_fraction"].attrs = dict(
-            standard_name="signal_fraction",
             long_name="Fraction of bins that contain signal",
             description="Fraction of bins that contain signal. 1 means all "
             "bins contain signal, 0 means no bins contain signal.",
         )
 
         self.ds["ms_flag"].attrs = dict(
-            standard_name="multiple_scattering",
             long_name="Multiple scattering flag",
             description="Multiple scattering flag. 1 means multiple "
             "scattering occurs, 0 means no multiple scattering occurs. "
@@ -847,28 +837,24 @@ class Simulator:
         )
 
         self.ds["folding_flag"].attrs = dict(
-            standard_name="folding_flag",
             long_name="Folding flag",
             description="Folding flag. 1 means velocity is folded, 0 means "
             "velocity is not folded.",
         )
 
         self.ds["ze_acon"].attrs = dict(
-            standard_name="radar_reflectivity_factor",
             long_name="Convolved radar reflectivity factor",
             units="mm6 m-3",
             description="Convolved radar reflectivity factor",
         )
 
         self.ds["vm_acon"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved mean Doppler velocity",
             units="m s-1",
             description="Convolved mean Doppler velocity",
         )
 
         self.ds["vm_acon_err"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved mean Doppler velocity with satellite motion "
             "error",
             units="m s-1",
@@ -877,21 +863,18 @@ class Simulator:
         )
 
         self.ds["ze_aconint"].attrs = dict(
-            standard_name="radar_reflectivity_factor",
             long_name="Convolved and integrated radar reflectivity factor",
             units="mm6 m-3",
             description="Convolved and integrated radar reflectivity factor",
         )
 
         self.ds["vm_aconint"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved and integrated mean Doppler velocity",
             units="m s-1",
             description="Convolved and integrated mean Doppler velocity",
         )
 
         self.ds["vm_aconint_err"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved and integrated mean Doppler velocity with "
             "satellite motion error",
             units="m s-1",
@@ -900,7 +883,6 @@ class Simulator:
         )
 
         self.ds["ze_sat"].attrs = dict(
-            standard_name="radar_reflectivity_factor",
             long_name="Convolved and integrated radar reflectivity factor",
             units="mm6 m-3",
             description="Convolved and integrated radar reflectivity factor"
@@ -908,7 +890,6 @@ class Simulator:
         )
 
         self.ds["vm_sat"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved and integrated mean Doppler velocity",
             units="m s-1",
             description="Convolved and integrated mean Doppler velocity"
@@ -916,7 +897,6 @@ class Simulator:
         )
 
         self.ds["vm_sat_vel"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved and integrated mean Doppler velocity with "
             "satellite motion error",
             units="m s-1",
@@ -925,7 +905,6 @@ class Simulator:
         )
 
         self.ds["vm_bias"].attrs = dict(
-            standard_name="mean_doppler_velocity_bias",
             long_name="Doppler velocity bias",
             units="m s-1",
             description="Doppler velocity bias between the estimate with and "
@@ -934,7 +913,6 @@ class Simulator:
         )
 
         self.ds["ze_sat_noise"].attrs = dict(
-            standard_name="radar_reflectivity_factor",
             long_name="Convolved and integrated radar reflectivity factor "
             "with noise",
             units="mm6 m-3",
@@ -943,7 +921,6 @@ class Simulator:
         )
 
         self.ds["vm_sat_noise"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Convolved and integrated mean Doppler velocity with "
             "noise and satellite motion error",
             units="m s-1",
@@ -952,7 +929,6 @@ class Simulator:
         )
 
         self.ds["vm_sat_folded"].attrs = dict(
-            standard_name="mean_doppler_velocity",
             long_name="Doppler velocity with noise, satellite motion error, "
             "and folding",
             units="m s-1",
@@ -967,14 +943,14 @@ class Simulator:
         )
         self.ds["time"].attrs = dict(
             standard_name="time",
-            long_name="Time",
+            long_name="Time UTC",
         )
 
         # add variables about satellite
         self.ds["sat_ifov"] = xr.DataArray(
             self.beam.ifov,
             attrs=dict(
-                standard_name="sat_ifov",
+                # standard_name="sat_ifov",
                 long_name="Satellite instantaneous field of view",
                 units="m",
                 description="Satellite instantaneous field of view",
@@ -984,7 +960,7 @@ class Simulator:
         self.ds["sat_range_resolution"] = xr.DataArray(
             self.beam.spec.range_resolution,
             attrs=dict(
-                standard_name="sat_range_resolution",
+                # standard_name="sat_range_resolution",
                 long_name="Satellite range resolution",
                 units="m",
                 description="Satellite range resolution",
@@ -994,7 +970,7 @@ class Simulator:
         self.ds["sat_along_track_resolution"] = xr.DataArray(
             self.beam.spec.along_track_resolution,
             attrs=dict(
-                standard_name="sat_along_track_resolution",
+                # standard_name="sat_along_track_resolution",
                 long_name="Satellite along-track resolution",
                 units="m",
                 description="Satellite along-track resolution",
@@ -1002,16 +978,15 @@ class Simulator:
         )
 
         # global attributes
-        self.ds.attrs["title"] = (
-            f"{self.beam.spec.name} simulated from "
-            f"suborbital observations with orbital-radar {__version__}"
-        )
-        self.ds.attrs["created"] = str(np.datetime64("now"))
-        self.ds.attrs["description"] = (
-            "Simulated spaceborne radar reflectivity and Doppler velocity "
-            "from suborbital radar data. The forward simulation "
-            "follows Kollias et al. (2014) and Lamer et al. (2020)"
-        )
+        # self.ds.attrs["title"] = (
+        #     f"{self.beam.spec.name} simulated from "
+        #     f"suborbital observations with orbital-radar {__version__}"
+        # )
+        # self.ds.attrs["description"] = (
+        #     "Simulated spaceborne radar reflectivity and Doppler velocity "
+        #     "from suborbital radar data. The forward simulation "
+        #     "follows Kollias et al. (2014) and Lamer et al. (2020)"
+        # )
 
     def plot(self, **kwds):
         """
