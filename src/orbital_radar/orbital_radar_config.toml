@@ -3,7 +3,7 @@
 [prepare]
 
 [prepare.general]
-height_min = -2500.0
+height_min = -100.0
 height_max = 17500.0
 height_res = 10.0
 ground_echo_ze_max = 52

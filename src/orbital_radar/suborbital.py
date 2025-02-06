@@ -122,16 +122,16 @@ class Suborbital(Simulator):
 
         self._to_netcdf(output_filepath)
 
-        self._harmonize_for_cloudnet(
+        file_uuid = self._harmonize_for_cloudnet(
             output_filepath, categorize_filepath, uuid
         )
 
-        return str(uuid)
+        return file_uuid
 
     @staticmethod
     def _harmonize_for_cloudnet(
         filepath: str, source_filepath: str, uuid: uuidlib.UUID | None = None
-    ):
+    ) -> str:
         # Harmonize netCDF file to be Cloudnet-compatible
         with (
             netCDF4.Dataset(filepath, "r+") as nc,
@@ -139,6 +139,7 @@ class Suborbital(Simulator):
         ):
             if uuid is None:
                 uuid = uuidlib.uuid4()
+
             nc.file_uuid = str(uuid)
 
             # convert nanoseconds to fraction hour
@@ -151,16 +152,7 @@ class Suborbital(Simulator):
                 raise NotImplementedError("Time units not supported")
 
             # Global attributes
-            file_type = "earthcare"
-            nc.location = nc_source.location
-            nc.title = f"Simulated EarthCARE radar from {nc_source.location}"
-            nc.source = nc_source.variables["Z"].source
-            nc.source_file_uuids = nc_source.file_uuid
-            nc.cloudnet_file_type = file_type
-            nc.history = (
-                f"{datetime.datetime.now()} - {file_type} file created\n"
-                + nc.history
-            )
+
             for attr in (
                 "cloudnetpy_version",
                 "pid",
@@ -171,6 +163,19 @@ class Suborbital(Simulator):
             ):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
+
+            file_type = "earthcare"
+            nc.location = nc_source.location
+            nc.title = f"Simulated EarthCARE radar from {nc_source.location}"
+            nc.source = nc_source.variables["Z"].source
+            nc.source_file_uuids = nc_source.file_uuid
+            nc.cloudnet_file_type = file_type
+            nc.history = (
+                f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S +00:00} - {file_type} file created\n"
+                + nc.history
+            )
+
+        return str(uuid)
 
     def _convert_frequency(self, ds: xr.Dataset):
         """
