@@ -16,6 +16,7 @@ import datetime
 import logging
 import pathlib
 import uuid as uuidlib
+from dataclasses import dataclass
 
 import netCDF4
 import numpy as np
@@ -23,10 +24,18 @@ import xarray as xr
 
 from orbital_radar.helpers import db2li, li2db, remove_duplicate_times
 from orbital_radar.radarspec import RadarBeam
-from orbital_radar.readers.config import read_config
 from orbital_radar.readers.radar import Radar
 from orbital_radar.simulator import Simulator
 from orbital_radar.version import __version__
+
+
+@dataclass
+class SatelliteOptions:
+    height_min: float = -2500.0
+    height_max: float = 17500.0
+    height_res: float = 10.0
+    ground_echo_ze_max: float = 52.0
+    ground_echo_pulse_length: float = 100.0
 
 
 class Suborbital(Simulator):
@@ -38,6 +47,7 @@ class Suborbital(Simulator):
         self,
         geometry: str = "groundbased",
         input_radar_format: str = "cloudnet",
+        satellite_options: SatelliteOptions = SatelliteOptions(),
     ):
         """
         Initialize the simulator for suborbital radar data.
@@ -55,12 +65,7 @@ class Suborbital(Simulator):
 
         self.geometry = geometry
         self.input_radar_format = input_radar_format
-
-        # Read config file
-        file_path = pathlib.Path(__file__).parent.absolute()
-        self.config = read_config(file_path / "orbital_radar_config.toml")
-
-        self.prepare = self.config["prepare"]["general"]
+        self.satellite_options = satellite_options
 
         file_path = pathlib.Path(__file__).parent.absolute()
         cpr_file = file_path / "data/CPR_PointTargetResponse.txt"
@@ -322,9 +327,9 @@ class Suborbital(Simulator):
         """
 
         height_regular = np.arange(
-            self.prepare["height_min"],
-            self.prepare["height_max"],
-            self.prepare["height_res"],
+            self.satellite_options.height_min,
+            self.satellite_options.height_max,
+            self.satellite_options.height_res,
         )
 
         da_height_regular = xr.DataArray(
@@ -438,19 +443,21 @@ class Suborbital(Simulator):
 
         # grid with size of two pulse lengths centered around zero
         height_bins = np.arange(
-            -self.prepare["ground_echo_pulse_length"],
-            self.prepare["ground_echo_pulse_length"]
-            + self.prepare["height_res"],
-            self.prepare["height_res"],
+            -self.satellite_options.ground_echo_pulse_length,
+            self.satellite_options.ground_echo_pulse_length
+            + self.satellite_options.height_res,
+            self.satellite_options.height_res,
         )
 
         # calculate range weighting function
         weights = RadarBeam._normalized_range_weighting_function_default(
-            pulse_length=self.prepare["ground_echo_pulse_length"],
+            pulse_length=self.satellite_options.ground_echo_pulse_length,
             range_bins=height_bins,
         )
 
-        ground_echo = weights * db2li(self.prepare["ground_echo_ze_max"])
+        ground_echo = weights * db2li(
+            self.satellite_options.ground_echo_ze_max
+        )
 
         # add ground echo to dataset shifted by one height bin to have maximum
         # below zero
@@ -464,7 +471,7 @@ class Suborbital(Simulator):
         height_bins = (
             base
             + height_bins[int(len(height_bins) / 2) :]
-            - self.prepare["height_res"]
+            - self.satellite_options.height_res
         )
 
         # add ground echo to dataset (first fill nan values with zero in this
