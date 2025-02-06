@@ -14,7 +14,9 @@ height above ground for groundbased
 
 import logging
 import pathlib
+import uuid as uuidlib
 
+import netCDF4
 import numpy as np
 import xarray as xr
 
@@ -69,7 +71,8 @@ class Suborbital(Simulator):
         categorize_filepath: str,
         output_filepath: str,
         mean_wind: float,
-    ):
+        uuid: uuidlib.UUID | None = None,
+    ) -> str:
         """
         Runs simulation for a single day.
 
@@ -101,7 +104,7 @@ class Suborbital(Simulator):
 
             ds = self._interpolate_to_regular_grid(radar.ds_rad)
 
-            # TODO: Check this. Cloudnet categorize is already attenuation corrected?
+            # TODO: Check this. Cloudnet categorize is already attenuation corrected?!
             ds = self._apply_gas_attenuation(ds, ds_categorize)
 
         ds = self._add_ground_echo(ds)
@@ -112,6 +115,26 @@ class Suborbital(Simulator):
         self._add_ground_based_variables(mean_wind)
 
         self._to_netcdf(output_filepath)
+
+        # Harmonize netCDF file to be Cloudnet-compatible
+        with netCDF4.Dataset(output_filepath, "r+") as nc:
+            if uuid is None:
+                uuid = uuidlib.uuid4()
+            nc.file_uuid = str(uuid)
+
+            # convert nanoseconds to fraction hour
+            time = nc.variables["time"]
+            if "nanoseconds" in time.units:
+                time[:] /= 3.6e12
+                date = time.units.split("since")[1].strip()
+                time.units = f"hours since {date} 00:00:00"
+            else:
+                raise NotImplementedError("Time units not supported")
+
+            nc.source_file_uuids = ds_categorize.file_uuid
+            nc.cloudnet_file_type = "earthcare"
+
+        return str(uuid)
 
     def _convert_frequency(self, ds: xr.Dataset):
         """
