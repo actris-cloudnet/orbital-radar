@@ -1,15 +1,6 @@
 """
 This module contains the OrbitalRadar class that runs the simulator for
 suborbital radar data. It is a subclass of the Simulator class.
-
-Difference between ground-based and airborne radar geometry:
-- along-track coordinate from mean wind for ground based and mean flight vel.
-from airborne radar
-- no ground echo added to airborne radar
-- range grid of airborne radar assumed to be height above mean sea level and
-height above ground for groundbased
-- no attenuation correction for airborne radar
-- lat/lon coordinates included as input to airborne radar
 """
 
 import datetime
@@ -45,8 +36,6 @@ class Suborbital(Simulator):
 
     def __init__(
         self,
-        geometry: str = "groundbased",
-        input_radar_format: str = "cloudnet",
         satellite_options: SatelliteOptions = SatelliteOptions(),
     ):
         """
@@ -54,19 +43,11 @@ class Suborbital(Simulator):
 
         Parameters
         ----------
-        geometry : str
-            Observation geometry of radar (groundbased or airborne).
-        input_radar_format : str
-            Format of the input radar data (e.g. cloudnet).
-        config_file : str
-            Path to the configuration file that contains the site-dependent
-            parameters and directory paths.
+        satellite_options : SatelliteOptions
+            Options for the satellite radar.
         """
 
-        self.geometry = geometry
-        self.input_radar_format = input_radar_format
         self.satellite_options = satellite_options
-
         file_path = pathlib.Path(__file__).parent.absolute()
         cpr_file = file_path / "data/CPR_PointTargetResponse.txt"
 
