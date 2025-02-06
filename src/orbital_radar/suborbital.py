@@ -5,7 +5,6 @@ suborbital radar data. It is a subclass of the Simulator class.
 
 import datetime
 import logging
-import pathlib
 import uuid as uuidlib
 from dataclasses import dataclass
 
@@ -48,10 +47,7 @@ class Suborbital(Simulator):
         """
 
         self.satellite_options = satellite_options
-        file_path = pathlib.Path(__file__).parent.absolute()
-        cpr_file = file_path / "data/CPR_PointTargetResponse.txt"
-
-        super().__init__(file_earthcare=cpr_file)
+        super().__init__()
 
     def simulate_cloudnet(
         self,
@@ -65,10 +61,10 @@ class Suborbital(Simulator):
 
         Parameters
         ----------
-        date : np.datetime64
-            Date to simulate.
-        write_output : bool
-            If True, write output to netcdf file.
+        categorize_filepath : str
+            Path to Cloudnet categorize file.
+        output_filepath : str
+            Path to output file.
         mean_wind : float
             Mean wind speed in m/s.
         """
@@ -116,19 +112,16 @@ class Suborbital(Simulator):
 
     @staticmethod
     def _harmonize_for_cloudnet(
-        filepath: str, source_filepath: str, uuid: uuidlib.UUID | None = None
+        filepath: str, source_filepath: str, uuid: uuidlib.UUID | None
     ) -> str:
-        # Harmonize netCDF file to be Cloudnet-compatible
         with (
             netCDF4.Dataset(filepath, "r+") as nc,
             netCDF4.Dataset(source_filepath, "r") as nc_source,
         ):
             if uuid is None:
                 uuid = uuidlib.uuid4()
-
             nc.file_uuid = str(uuid)
 
-            # convert nanoseconds to fraction hour
             time = nc.variables["time"]
             if "nanoseconds" in time.units:
                 time[:] /= 3.6e12
@@ -136,8 +129,6 @@ class Suborbital(Simulator):
                 time.units = f"hours since {date} 00:00:00 +00:00"
             else:
                 raise NotImplementedError("Time units not supported")
-
-            # Global attributes
 
             for attr in (
                 "cloudnetpy_version",
@@ -151,11 +142,11 @@ class Suborbital(Simulator):
                     nc.delncattr(attr)
 
             file_type = "earthcare"
+            nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
             nc.title = f"Simulated EarthCARE radar from {nc_source.location}"
             nc.source = nc_source.variables["Z"].source
             nc.source_file_uuids = nc_source.file_uuid
-            nc.cloudnet_file_type = file_type
             nc.history = (
                 f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S +00:00} - {file_type} file created\n"
                 + nc.history
@@ -163,7 +154,7 @@ class Suborbital(Simulator):
 
         return str(uuid)
 
-    def _convert_frequency(self, ds: xr.Dataset):
+    def _convert_frequency(self, ds: xr.Dataset) -> xr.Dataset:
         """
         Convert frequency from 35 to 94 GHz.
 
@@ -199,7 +190,7 @@ class Suborbital(Simulator):
 
     def _correct_dielectric_constant(
         self, ds: xr.Dataset, satellite_k2: float, radar_k2: float
-    ):
+    ) -> xr.Dataset:
         r"""
         Apply correction for dielectric constant assumed in Ze calculation
         of suborbital radar to match the dielectric constant of the
@@ -215,6 +206,10 @@ class Suborbital(Simulator):
         ----------
         ds : xarray.Dataset
             Data with "ze" variable.
+        satellite_k2 : float
+            Dielectric constant of the spaceborne radar.
+        radar_k2 : float
+            Dielectric constant of the suborbital radar.
         """
 
         logging.info(
@@ -227,7 +222,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def _add_vmze_attrs(self, ds):
+    def _add_vmze_attrs(self, ds: xr.Dataset) -> xr.Dataset:
         """
         Adds attributes to Doppler velocity and radar reflectivity variables.
 
@@ -258,7 +253,9 @@ class Suborbital(Simulator):
 
         return ds
 
-    def _create_along_track(self, ds, mean_wind: float):
+    def _create_along_track(
+        self, ds: xr.Dataset, mean_wind: float
+    ) -> xr.Dataset:
         """
         Creates along-track coordinates from time coordinates.
 
@@ -266,6 +263,8 @@ class Suborbital(Simulator):
         ----------
         ds : xarray.Dataset
             Data with "time" and "height" coordinates.
+        mean_wind : float
+            Mean wind speed in m/s.
 
         Returns
         -------
@@ -297,7 +296,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def _create_regular_height(self):
+    def _create_regular_height(self) -> xr.DataArray:
         """
         Creates regular height coordinate for suborbital radar.
 
@@ -325,7 +324,7 @@ class Suborbital(Simulator):
 
         return da_height_regular
 
-    def _create_regular_along_track(self, ds):
+    def _create_regular_along_track(self, ds: xr.Dataset) -> xr.DataArray:
         """
         Creates regular along-track coordinate for suborbital radar.
 
@@ -360,7 +359,7 @@ class Suborbital(Simulator):
 
         return da_along_track_regular
 
-    def _interpolate_to_regular_grid(self, ds):
+    def _interpolate_to_regular_grid(self, ds: xr.Dataset) -> xr.Dataset:
         """
         Interpolates radar data to regular grid in along-track and height.
 
@@ -398,7 +397,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def _add_ground_echo(self, ds):
+    def _add_ground_echo(self, ds: xr.Dataset) -> xr.Dataset:
         """
         Calculates artificial ground echo inside ground-based radar range
         grid. The values are chosen such that the final ground echo after
@@ -464,12 +463,7 @@ class Suborbital(Simulator):
 
         return ds
 
-    def _add_ground_based_variables(self, mean_wind: float):
-        """
-        Add variables specific to groundbased simulator to the dataset, i.e.,
-        the mean horizontal wind.
-        """
-
+    def _add_ground_based_variables(self, mean_wind: float) -> None:
         self.ds["mean_wind"] = xr.DataArray(
             mean_wind,
             attrs=dict(
@@ -479,7 +473,7 @@ class Suborbital(Simulator):
             ),
         )
 
-    def _to_netcdf(self, output_filepath: str):
+    def _to_netcdf(self, output_filepath: str) -> None:
         """
         Writes dataset to netcdf file. Note that not all variables are stored.
 
@@ -529,7 +523,9 @@ class Suborbital(Simulator):
         )
         logging.debug(f"Written file: {output_filepath}")
 
-    def _apply_gas_attenuation(self, ds: xr.Dataset, ds_cloudnet: xr.Dataset):
+    def _apply_gas_attenuation(
+        self, ds: xr.Dataset, ds_cloudnet: xr.Dataset
+    ) -> xr.Dataset:
         """
         Gas attenuation correction based on Cloudnet categorize file.
 

@@ -59,8 +59,8 @@ Schirmacher et al. (2023) : https://doi.org/10.5194/egusphere-2023-636
 Tanelli et al. (2008)     : https://doi.org/10.1109/TGRS.2008.2002030
 """
 
+import pathlib
 from dataclasses import dataclass
-from pathlib import Path
 from typing import List, Union
 
 import numpy as np
@@ -274,7 +274,6 @@ class RadarBeam:
 
     def __init__(
         self,
-        file_earthcare: Path,
         sat_name: str | None = None,
         nyquist_from_prf: bool = False,
         **sat_params,
@@ -327,9 +326,6 @@ class RadarBeam:
         self.spec.vm_std_broad = np.array(self.spec.vm_std_broad)
 
         self.sat_name = sat_name
-
-        # add range weighting function file
-        self.file_earthcare = file_earthcare
 
         # initialize along-track and along-range averaging parameters
         self.atrack_bins = np.array([])
@@ -548,7 +544,7 @@ class RadarBeam:
         self._create_along_range_grid(range_coords=range_coords)
 
         # range weighting function
-        if self.sat_name == "earthcare" and self.file_earthcare is not None:
+        if self.sat_name == "earthcare":
             self.range_weights = (
                 self._normalized_range_weighting_function_earthcare()
             )
@@ -574,7 +570,10 @@ class RadarBeam:
             normalized range weighting function
         """
 
-        ds_wf = read_range_weighting_function(self.file_earthcare)
+        file_path = pathlib.Path(__file__).parent.absolute()
+        cpr_file = file_path / "data/CPR_PointTargetResponse.txt"
+
+        ds_wf = read_range_weighting_function(cpr_file)
 
         # linearize the weighting function
         da_wf = db2li(ds_wf["response"])

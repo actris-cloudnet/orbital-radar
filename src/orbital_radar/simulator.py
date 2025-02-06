@@ -24,7 +24,6 @@ class Simulator:
 
     def __init__(
         self,
-        file_earthcare: Path,
         sat_name: str = "earthcare",
         nyquist_from_prf: bool = False,
         ms_threshold: float = 12.0,
@@ -54,9 +53,6 @@ class Simulator:
         nyquist_from_prf : bool
             If True, the Nyquist velocity is calculated from the pulse
             repetition frequency (PRF).
-        file_earthcare : str
-            path to file containing EarthCARE CPR weighting function. This
-            file is used if the satellite name is 'earthcare'.
         radar_specs : dict
             Dictionary with radar specifications.
         """
@@ -72,7 +68,6 @@ class Simulator:
         # get radar specifications
         self.beam = RadarBeam(
             sat_name=self.sat_name,
-            file_earthcare=file_earthcare,
             nyquist_from_prf=nyquist_from_prf,
             **self.radar_specs,
         )
