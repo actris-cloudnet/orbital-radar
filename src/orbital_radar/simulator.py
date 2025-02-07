@@ -2,8 +2,6 @@
 Runs the orbital radar simulator.
 """
 
-from pathlib import Path
-
 import numpy as np
 import xarray as xr
 from scipy import stats
@@ -374,7 +372,7 @@ class Simulator:
             },
         )
 
-    def _calculate_nubf_flag(self, threshold=1):
+    def _calculate_nubf_flag(self, threshold: float = 1.0):
         """
         Calculate non-uniform beam filling flag. The flag is 1 if the
         non-uniform beam filling is higher than a certain threshold, and 0
@@ -396,7 +394,7 @@ class Simulator:
 
         self.ds["vm_bias"] = self.ds["vm_sat"] - self.ds["vm_sat_vel"]
 
-    def _calculate_vm_bias_flag(self, threshold=0.5):
+    def _calculate_vm_bias_flag(self, threshold: float = 0.5):
         """
         Calculate the satellite Doppler velocity bias flag. The flag is 1 if
         the absolute satellite Doppler velocity bias is higher than 0.5 m s-1,
@@ -483,7 +481,7 @@ class Simulator:
         )
         self.ds["ms_flag"].loc[{"height_sat": subsurface}] = 0
 
-    def _apply_detection_limit(self, var_ze, var_other: list):
+    def _apply_detection_limit(self, var_ze: str, var_other: list):
         """
         Applies the detection limit of the spaceborne radar to the along-height
         convoluted data.
@@ -504,7 +502,7 @@ class Simulator:
             self.ds[var] = self.ds[var].where(ix)
 
     @staticmethod
-    def add_noise(x, x_std, noise):
+    def add_noise(x, x_std: xr.DataArray, noise):
         """
         Equation to calculate the noise from values without noise, the
         uncertainty of the values, and random noise.
