@@ -36,6 +36,9 @@ dev = ["numpydoc", "pre-commit", "matplotlib", "release-version"]
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
 
+[tool.hatch.version]
+path = "src/orbital_radar/version.py"
+
 [tool.mypy]
 check_untyped_defs = true
 
