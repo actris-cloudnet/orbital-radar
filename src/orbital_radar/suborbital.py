@@ -146,6 +146,10 @@ class Suborbital(Simulator):
                 nc.variables[var][:] = li2db(nc.variables[var][:])
                 nc.variables[var].units = "dBZ"
 
+            # Change velocity direction to match Cloudnet
+            for var in ("vm_sat", "vm_sat_noise", "vm_sat_folded"):
+                nc.variables[var][:] *= -1
+
             file_type = "earthcare"
             nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
