@@ -4,7 +4,6 @@ build-backend = "hatchling.build"
 
 [project]
 name = "orbital-radar"
-version = "0.0.2"
 authors = [
   {name = "Nils Risse", email = "n.risse@uni-koeln.de"},
   {name = "Lukas Pfitzenmaier", email = "l.pfitzenmaier@uni-koeln.de"},
@@ -28,10 +27,11 @@ dependencies = [
   "xarray",
   "matplotlib"
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = ["mypy", "pytest", "ruff"]
-dev = ["numpydoc", "pre-commit", "matplotlib"]
+dev = ["numpydoc", "pre-commit", "matplotlib", "release-version"]
 
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
@@ -42,6 +42,11 @@ check_untyped_defs = true
 [[tool.mypy.overrides]]
 module = ["matplotlib.*", "netCDF4.*", "scipy.*", "skimage.*", "pandas.*"]
 ignore_missing_imports = true
+
+[tool.release-version]
+filename = "src/orbital_radar/version.py"
+pattern = ["__version__ = \"(?P<major>\\d+).(?P<minor>\\d+).(?P<patch>\\d+)\""]
+changelog = "CHANGELOG.md"
 
 [tool.ruff]
 line-length = 79
