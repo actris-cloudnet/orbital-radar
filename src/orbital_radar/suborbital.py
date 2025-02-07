@@ -141,6 +141,11 @@ class Suborbital(Simulator):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
 
+            # Convert linear units to dB
+            for var in ("ze_sat",):
+                nc.variables[var][:] = li2db(nc.variables[var][:])
+                nc.variables[var].units = "dBZ"
+
             file_type = "earthcare"
             nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
