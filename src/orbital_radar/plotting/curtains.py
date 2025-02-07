@@ -10,9 +10,8 @@ import numpy as np
 from orbital_radar.helpers import li2db
 
 # visualization settings
-FACECOLOR = "silver"  # background color of each axis (e.g. gray)
-
-mpl.rcParams["axes.facecolor"] = FACECOLOR
+# FACECOLOR = "silver"  # background color of each axis (e.g. gray)
+# mpl.rcParams["axes.facecolor"] = FACECOLOR
 
 
 def axis_label(ax, label):
