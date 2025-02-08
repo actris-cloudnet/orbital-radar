@@ -126,6 +126,27 @@ class Suborbital(Simulator):
             time = nc.variables["time"]
             time.units = time.units[:22] + " 00:00:00 +00:00"
 
+            # Add offset to along_track stuff to match Cloudnet timestamps
+            # TODO: there must be a way fix this earlier in the code
+            time = time[:]
+            n_hours_of_data = time[-1] - time[0]
+            for key in ("along_track", "along_track_sat"):
+                data = nc.variables[key][:]
+                distance_covered = data[-1] - data[0]
+                distance_per_hour = distance_covered / n_hours_of_data
+                offset = distance_per_hour * time[0]
+                nc.variables[key][:] += offset
+
+            # Convert linear units to dB
+            for var in ("ze_sat",):
+                nc.variables[var][:] = li2db(nc.variables[var][:])
+                nc.variables[var].units = "dBZ"
+
+            # Change velocity direction to match Cloudnet
+            for var in ("vm_sat", "vm_sat_noise", "vm_sat_folded"):
+                nc.variables[var][:] *= -1
+
+            # Remove unnecessary global attributes
             for attr in (
                 "cloudnetpy_version",
                 "pid",
@@ -136,15 +157,6 @@ class Suborbital(Simulator):
             ):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
-
-            # Convert linear units to dB
-            for var in ("ze_sat",):
-                nc.variables[var][:] = li2db(nc.variables[var][:])
-                nc.variables[var].units = "dBZ"
-
-            # Change velocity direction to match Cloudnet
-            for var in ("vm_sat", "vm_sat_noise", "vm_sat_folded"):
-                nc.variables[var][:] *= -1
 
             file_type = "earthcare-simulation"
             nc.cloudnet_file_type = file_type
@@ -277,9 +289,14 @@ class Suborbital(Simulator):
             Data with "along_track" coordinate.
         """
 
-        # calculate the along-track distance
-        dt = ds.time.diff("time") / np.timedelta64(1, "s")
-        dt = xr.align(ds.time, dt, join="outer")[1].fillna(0)  # start is dt=0
+        dt = ds.time.diff("time") / np.timedelta64(
+            1, "s"
+        )  # time difference [s]
+
+        dt = xr.align(ds.time, dt, join="outer")[1].fillna(
+            0
+        )  # start is dt = 0
+
         arr_along_track = np.cumsum(mean_wind * dt)
 
         da_along_track = xr.DataArray(
