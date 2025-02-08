@@ -122,13 +122,9 @@ class Suborbital(Simulator):
                 uuid = uuidlib.uuid4()
             nc.file_uuid = str(uuid)
 
+            # Format time units
             time = nc.variables["time"]
-            if "nanoseconds" in time.units:
-                time[:] /= 3.6e12
-                date = time.units.split("since")[1].split()[0]
-                time.units = f"hours since {date} 00:00:00 +00:00"
-            else:
-                raise NotImplementedError("Time units not supported")
+            time.units = time.units[:22] + " 00:00:00 +00:00"
 
             for attr in (
                 "cloudnetpy_version",
@@ -150,7 +146,7 @@ class Suborbital(Simulator):
             for var in ("vm_sat", "vm_sat_noise", "vm_sat_folded"):
                 nc.variables[var][:] *= -1
 
-            file_type = "earthcare"
+            file_type = "earthcare-simulation"
             nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
             nc.title = f"Simulated EarthCARE radar from {nc_source.location}"
@@ -493,11 +489,17 @@ class Suborbital(Simulator):
 
         """
 
+        date = self.ds.time[0].dt.strftime("%Y-%m-%d").item()
+
+        TIME = {
+            "dtype": "float64",
+            "_FillValue": None,
+            "units": f"hours since {date} 00:00:00 +00:00",
+        }
         FLOAT = {
             "dtype": "float32",
             "_FillValue": netCDF4.default_fillvals["f4"],
         }
-        TIME = {"dtype": "float64", "_FillValue": None}
         INT = {"dtype": "int32", "_FillValue": netCDF4.default_fillvals["i4"]}
         FLOAT_SCALAR = {"dtype": "float32", "_FillValue": None}
 
