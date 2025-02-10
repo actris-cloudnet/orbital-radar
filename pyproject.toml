@@ -24,14 +24,13 @@ dependencies = [
   "numpy",
   "pandas",
   "scipy",
-  "xarray",
-  "matplotlib"
+  "xarray"
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 test = ["mypy", "pytest", "ruff"]
-dev = ["numpydoc", "pre-commit", "matplotlib", "release-version"]
+dev = ["pre-commit", "release-version"]
 
 [project.urls]
 documentation = "https://igmk.github.io/orbital-radar/overview.html"
