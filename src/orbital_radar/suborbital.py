@@ -54,7 +54,7 @@ class Suborbital(Simulator):
         categorize_filepath: str,
         output_filepath: str,
         mean_wind: float,
-        uuid: uuidlib.UUID | None = None,
+        uuid: str | None = None,
     ) -> str:
         """
         Runs simulation for a single day.
@@ -112,15 +112,15 @@ class Suborbital(Simulator):
 
     @staticmethod
     def _harmonize_for_cloudnet(
-        filepath: str, source_filepath: str, uuid: uuidlib.UUID | None
+        filepath: str, source_filepath: str, uuid: str | None
     ) -> str:
         with (
             netCDF4.Dataset(filepath, "r+") as nc,
             netCDF4.Dataset(source_filepath, "r") as nc_source,
         ):
             if uuid is None:
-                uuid = uuidlib.uuid4()
-            nc.file_uuid = str(uuid)
+                uuid = str(uuidlib.uuid4())
+            nc.file_uuid = uuid
 
             # Format time units
             time = nc.variables["time"]
@@ -158,10 +158,10 @@ class Suborbital(Simulator):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
 
-            file_type = "earthcare-simulation"
+            file_type = "cpr-simulation"
             nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
-            nc.title = f"Simulated EarthCARE radar from {nc_source.location}"
+            nc.title = f"Simulated CPR radar from {nc_source.location}"
             nc.source = nc_source.variables["Z"].source
             nc.source_file_uuids = nc_source.file_uuid
             nc.history = (
@@ -169,7 +169,7 @@ class Suborbital(Simulator):
                 + nc.history
             )
 
-        return str(uuid)
+        return uuid
 
     def _convert_frequency(self, ds: xr.Dataset) -> xr.Dataset:
         """
