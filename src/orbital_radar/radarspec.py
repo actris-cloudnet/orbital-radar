@@ -274,7 +274,7 @@ class RadarBeam:
     for along-track and along-range averaging.
     """
 
-    def __init__(
+    def __init__(  # type: ignore
         self,
         sat_name: str | None = None,
         nyquist_from_prf: bool = False,

@@ -2,35 +2,62 @@
 This module contains helper functions for the orbital radar simulator.
 """
 
-from typing import TypeVar
+from typing import overload
 
 import numpy as np
 import xarray as xr
 
-T = TypeVar("T", xr.DataArray, np.ndarray, float)
+
+@overload
+def db2li(x: xr.DataArray) -> xr.DataArray: ...
 
 
-def db2li(x: T) -> T:
+@overload
+def db2li(x: float) -> float: ...
+
+
+@overload
+def db2li(x: np.ndarray) -> np.ndarray: ...
+
+
+def db2li(
+    x: xr.DataArray | float | np.ndarray,
+) -> xr.DataArray | float | np.ndarray:
     """
     Conversion from dB to linear.
 
     Parameters
     ----------
-    x : float
+    x :
         Any value or array to be converted from dB to linear unit
     """
     return 10 ** (0.1 * x)
 
 
-def li2db(x: T, epsilon: float = 1e-15) -> T:
+@overload
+def li2db(x: xr.DataArray) -> xr.DataArray: ...
+
+
+@overload
+def li2db(x: float) -> float: ...
+
+
+@overload
+def li2db(x: np.ndarray) -> np.ndarray: ...
+
+
+def li2db(
+    x: xr.DataArray | float | np.ndarray,
+) -> xr.DataArray | float | np.ndarray:
     """
     Conversion from linear to dB.
 
     Parameters
     ----------
-    x : float
+    x :
         Any value or array to be converted from linear to dB unit
     """
+    epsilon = 1e-15
     return 10 * np.log10(x + epsilon)
 
 

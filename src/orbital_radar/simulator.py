@@ -2,15 +2,14 @@
 Runs the orbital radar simulator.
 """
 
+from typing import overload
+
 import numpy as np
 import xarray as xr
 from scipy import stats
 from scipy.interpolate import interp1d
 
 from orbital_radar.helpers import db2li, li2db
-from orbital_radar.plotting.curtains import plot_along_track
-from orbital_radar.plotting.histogram import plot_histogram
-from orbital_radar.plotting.scatter import plot_scatter
 from orbital_radar.radarspec import RadarBeam
 from orbital_radar.version import __version__
 
@@ -20,7 +19,7 @@ class Simulator:
     Runs the orbital radar simulator.
     """
 
-    def __init__(
+    def __init__(  # type: ignore
         self,
         sat_name: str = "earthcare",
         nyquist_from_prf: bool = False,
@@ -384,7 +383,7 @@ class Simulator:
             },
         )
 
-    def _calculate_nubf_flag(self, threshold: float = 1.0):
+    def _calculate_nubf_flag(self, threshold: float = 1.0) -> None:
         """
         Calculate non-uniform beam filling flag. The flag is 1 if the
         non-uniform beam filling is higher than a certain threshold, and 0
@@ -406,7 +405,7 @@ class Simulator:
 
         self.ds["vm_bias"] = self.ds["vm_sat"] - self.ds["vm_sat_vel"]
 
-    def _calculate_vm_bias_flag(self, threshold: float = 0.5):
+    def _calculate_vm_bias_flag(self, threshold: float = 0.5) -> None:
         """
         Calculate the satellite Doppler velocity bias flag. The flag is 1 if
         the absolute satellite Doppler velocity bias is higher than 0.5 m s-1,
@@ -493,7 +492,7 @@ class Simulator:
         )
         self.ds["ms_flag"].loc[{"height_sat": subsurface}] = 0
 
-    def _apply_detection_limit(self, var_ze: str, var_other: list):
+    def _apply_detection_limit(self, var_ze: str, var_other: list) -> None:
         """
         Applies the detection limit of the spaceborne radar to the along-height
         convoluted data.
@@ -514,24 +513,26 @@ class Simulator:
             self.ds[var] = self.ds[var].where(ix)
 
     @staticmethod
-    def add_noise(x, x_std: xr.DataArray, noise):
+    def add_noise(
+        x: xr.DataArray, x_std: np.ndarray, noise: np.ndarray
+    ) -> xr.DataArray:
         """
         Equation to calculate the noise from values without noise, the
         uncertainty of the values, and random noise.
 
         Parameters
         ----------
-        x : xr.DataArray
+        x :
             Radar reflectivity [dB] or doppler velocity [m s-1]
-        x_std : float
+        x_std :
             Radar reflectivity uncertainty [dB] or doppler velocity uncertainty
             [m s-1]
-        noise : np.array
+        noise :
             Random noise with shape equal to x.
 
         Returns
         -------
-        x_noise : xr.DataArray
+        x_noise :
             Radar reflectivity with added noise [dB]
         """
 
@@ -539,7 +540,7 @@ class Simulator:
 
         return x_noise
 
-    def calculate_vm_std_nubf(self) -> xr.DataArray:
+    def calculate_vm_std_nubf(self) -> np.ndarray:
         """
         Calculate outstanding error in correcting Mean Doppler Velocity biases
         caused by non-uniform beam filling
@@ -585,13 +586,17 @@ class Simulator:
         )
 
         # calculate absolute value of ze gradient
-        ze_gradient = np.abs(ze_gradient)
+        ze_gradient_array = np.abs(ze_gradient)
 
-        vm_std_nubf = 0.15 * ze_gradient / 3
+        vm_std_nubf = 0.15 * ze_gradient_array / 3
 
         return vm_std_nubf
 
-    def vm_uncertainty_equation(self, vm_std_broad, vm_std_nubf):
+    def vm_uncertainty_equation(
+        self,
+        vm_std_broad: np.ndarray,
+        vm_std_nubf: np.ndarray,
+    ) -> np.ndarray:
         """
         Calculates the total Doppler velocity uncertainty based on the
         broadening Doppler velocity uncertainty and the non-uniform beam
@@ -608,9 +613,7 @@ class Simulator:
             [m s-1]
         """
 
-        vm_std = np.sqrt(vm_std_broad**2 + vm_std_nubf**2)
-
-        return vm_std
+        return np.sqrt(vm_std_broad**2 + vm_std_nubf**2)
 
     def _calculate_ze_noise(self) -> None:
         """
@@ -640,7 +643,7 @@ class Simulator:
             self.beam.spec.ze_bins,
             self.beam.spec.ze_std,
             kind="linear",
-            fill_value="extrapolate",  # type: ignore
+            fill_value="extrapolate",
         )
 
         # apply noise
@@ -682,7 +685,7 @@ class Simulator:
             self.beam.spec.vm_bins_broad,
             self.beam.spec.vm_std_broad,
             kind="linear",
-            fill_value="extrapolate",  # type: ignore
+            fill_value="extrapolate",
         )
 
         # calculate uncertainty due to broadening
@@ -963,43 +966,3 @@ class Simulator:
                 description="Satellite along-track resolution",
             ),
         )
-
-        # global attributes
-        # self.ds.attrs["title"] = (
-        #     f"{self.beam.spec.name} simulated from "
-        #     f"suborbital observations with orbital-radar {__version__}"
-        # )
-        # self.ds.attrs["description"] = (
-        #     "Simulated spaceborne radar reflectivity and Doppler velocity "
-        #     "from suborbital radar data. The forward simulation "
-        #     "follows Kollias et al. (2014) and Lamer et al. (2020)"
-        # )
-
-    def plot(self, **kwds):
-        """
-        Along-track plot of the simulated radar reflectivity and Doppler
-        velocity.
-        """
-
-        fig = plot_along_track(ds=self.ds, **kwds)
-
-        return fig
-
-    def plot_histogram(self, **kwds):
-        """
-        Histogram plot of the simulated radar reflectivity and Doppler
-        velocity.
-        """
-
-        fig = plot_histogram(ds=self.ds, **kwds)
-
-        return fig
-
-    def plot_scatter(self, **kwds):
-        """
-        Scatter plot between satellite data and suborbital data.
-        """
-
-        fig = plot_scatter(ds=self.ds, **kwds)
-
-        return fig
