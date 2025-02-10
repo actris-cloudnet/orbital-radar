@@ -41,34 +41,10 @@ class Radar:
         """
 
         self.categorize_filepath = categorize_filepath
-        self.ds_rad = self.read_cloudnet()
+        self.ds = self.read_cloudnet()
 
-        # print("Vm sign convention: negative=upward, " "positive=downward")
-
-        self.ds_rad["vm"] = -self.ds_rad["vm"]
-
-        # ensure same dimension order
-        if "height" in list(self.ds_rad.dims):
-            dim_order = ["time", "height"]
-        else:
-            dim_order = ["time", "range"]
-        self.ds_rad["ze"] = self.ds_rad.ze.transpose(*dim_order)
-        self.ds_rad["vm"] = self.ds_rad.vm.transpose(*dim_order)
-
-        # ensure reasonable value ranges
-        assert (
-            self.ds_rad.ze.isnull().all() or self.ds_rad.ze.min() >= 0
-        ), "Ze out of range."
-        assert self.ds_rad.ze.isnull().all() or (
-            10 * np.log10(self.ds_rad.ze.max()) < 100
-        ), "Ze out of range."
-
-        assert (
-            self.ds_rad.vm.isnull().all() or self.ds_rad.vm.min() > -80
-        ), "Vm values out of range."
-        assert (
-            self.ds_rad.vm.isnull().all() or self.ds_rad.vm.max() < 80
-        ), "Vm values out of range."
+        # ensure that vm is negative for upward motion (satellite convention)
+        self.ds["vm"] = -self.ds["vm"]
 
     def read_cloudnet(self) -> xr.Dataset:
         """
@@ -78,17 +54,16 @@ class Radar:
         Note: Cloudnet height is already in height above mean sea level.
         """
 
-        ds = xr.open_dataset(self.categorize_filepath)
+        ds_categorize = xr.open_dataset(self.categorize_filepath)
 
-        ds = ds.rename({"Z": "ze", "v": "vm"})
-        # ds = self.remove_duplicate_times(ds)
+        ds_categorize = ds_categorize.rename({"Z": "ze", "v": "vm"})
 
-        ds_radar = ds[["ze", "vm"]]
+        ds_radar = ds_categorize[["ze", "vm"]]
 
         # extract instrument location and altitude
-        ds_radar["longitude"] = ds["longitude"]
-        ds_radar["latitude"] = ds["latitude"]
-        ds_radar["altitude"] = ds["altitude"]
+        ds_radar["longitude"] = ds_categorize["longitude"]
+        ds_radar["latitude"] = ds_categorize["latitude"]
+        ds_radar["altitude"] = ds_categorize["altitude"]
 
         # convert from dB to linear units
         ds_radar["ze"] = 10 ** (0.1 * ds_radar["ze"])

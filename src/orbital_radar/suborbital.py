@@ -75,20 +75,20 @@ class Suborbital(Simulator):
             frequency = ds_categorize.radar_frequency.item()
 
             if np.isclose(frequency, 35, atol=1):
-                radar.ds_rad = self._convert_frequency(radar.ds_rad)
+                radar.ds = self._convert_frequency(radar.ds)
 
             # TODO: Check this. Maybe you want to do this every time after frequency conversion?
             elif np.isclose(frequency, 94, atol=1):
-                radar.ds_rad = self._correct_dielectric_constant(
-                    radar.ds_rad, satellite_k2=0.75, radar_k2=0.86
+                radar.ds = self._correct_dielectric_constant(
+                    radar.ds, satellite_k2=0.75, radar_k2=0.86
                 )
 
             else:
-                raise NotImplementedError("Frequency not supported")
+                raise ValueError(f"Frequency {frequency} not supported")
 
-            radar.ds_rad = self._create_along_track(radar.ds_rad, mean_wind)
+            radar.ds = self._create_along_track(radar.ds, mean_wind)
 
-            ds = self._interpolate_to_regular_grid(radar.ds_rad)
+            ds = self._interpolate_to_regular_grid(radar.ds)
 
             # TODO: Check this. Cloudnet categorize is already attenuation corrected?!
             ds = self._apply_gas_attenuation(ds, ds_categorize)
