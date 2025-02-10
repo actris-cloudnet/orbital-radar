@@ -140,7 +140,7 @@ class Suborbital(Simulator):
                 nc.variables[key][:] += offset
 
             # Convert linear units to dB
-            for var in ("ze_sat", "ze_sat_noise"):
+            for var in ("ze_sat", "ze_sat_noise", "ze"):
                 nc.variables[var][:] = li2db(nc.variables[var][:])
                 nc.variables[var].units = "dBZ"
 
