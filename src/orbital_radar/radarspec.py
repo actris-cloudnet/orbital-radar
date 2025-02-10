@@ -1,5 +1,7 @@
 import logging
 
+import xarray as xr
+
 """
 This module contains the satellite class and functions to calculate the
 along-track and along-range averaging parameters. Main method and
@@ -358,7 +360,9 @@ class RadarBeam:
         # show summary of satellite parameters
         # self.params
 
-    def calculate_weighting_functions(self, along_track_coords, range_coords):
+    def calculate_weighting_functions(
+        self, along_track_coords: xr.DataArray, range_coords: xr.DataArray
+    ) -> None:
         """
         Calculates the along-track and along-range weighting functions.
 
@@ -380,7 +384,7 @@ class RadarBeam:
         self._calculate_along_range(range_coords=range_coords)
 
     @property
-    def params(self):
+    def params(self) -> None:
         """Prints a summary of the satellite parameters"""
 
         print(
@@ -396,7 +400,7 @@ class RadarBeam:
             f"Pulse repetition frequency: {np.round(self.spec.pulse_repetition_frequency, 0)} Hz\n"
         )
 
-    def _calculate_wavelength(self):
+    def _calculate_wavelength(self) -> None:
         """
         Calculates the radar wavelength from the radar frequency.
 
@@ -409,7 +413,7 @@ class RadarBeam:
 
         self.wavelength = SPEED_OF_LIGHT / self.spec.frequency
 
-    def _calculate_nyquist_velocity(self):
+    def _calculate_nyquist_velocity(self) -> None:
         """
         Calculates the Nyquist velocity from the pulse repetition frequency
         and the radar wavelength.
@@ -419,7 +423,7 @@ class RadarBeam:
             self.wavelength * self.spec.pulse_repetition_frequency / 4
         )
 
-    def _calculate_ifov(self):
+    def _calculate_ifov(self) -> None:
         """
         Calculates the instantaneous field of view (IFOV) from the along-track
         averaging parameters.
@@ -437,7 +441,9 @@ class RadarBeam:
             * self.spec.ifov_scale
         )
 
-    def _create_along_track_grid(self, along_track_coords):
+    def _create_along_track_grid(
+        self, along_track_coords: xr.DataArray
+    ) -> None:
         """
         Creates the along-track grid.
 
@@ -466,7 +472,7 @@ class RadarBeam:
             np.arange(0, self.ifov / 2, step),
         )
 
-    def _create_along_range_grid(self, range_coords):
+    def _create_along_range_grid(self, range_coords: xr.DataArray) -> None:
         """
         Creates range grid at which range weighting function is evaluated.
 
@@ -495,7 +501,7 @@ class RadarBeam:
             step,
         )
 
-    def _calculate_along_track(self, along_track_coords):
+    def _calculate_along_track(self, along_track_coords: xr.DataArray) -> None:
         """
         Calculates along-track averaging parameters.
 
@@ -521,7 +527,7 @@ class RadarBeam:
             np.sum(self.atrack_weights) - 1 < 1e-10
         ), "Along-track weighting function is not normalized"
 
-    def _calculate_velocity_error(self):
+    def _calculate_velocity_error(self) -> None:
         """
         Calculates the velocity error due to satellite velocity.
         """
@@ -531,7 +537,7 @@ class RadarBeam:
             self.spec.velocity / self.spec.altitude
         ) * self.atrack_bins  # type: ignore
 
-    def _calculate_along_range(self, range_coords):
+    def _calculate_along_range(self, range_coords: xr.DataArray) -> None:
         """
         Calculates along-range averaging parameters.
 
@@ -557,7 +563,7 @@ class RadarBeam:
                 )
             )
 
-    def _normalized_range_weighting_function_earthcare(self):
+    def _normalized_range_weighting_function_earthcare(self) -> np.ndarray:
         """
         Prepares EarthCARE range weighting function for along-range averaging.
 
@@ -594,7 +600,9 @@ class RadarBeam:
         return range_weights
 
     @staticmethod
-    def _normalized_range_weighting_function_default(pulse_length, range_bins):
+    def _normalized_range_weighting_function_default(
+        pulse_length: float, range_bins: np.ndarray
+    ) -> np.ndarray:
         """
         Defines the range weighting function for the along-range averaging.
         """

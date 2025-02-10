@@ -13,7 +13,9 @@ from scipy.stats import gaussian_kde
 from orbital_radar.helpers import li2db
 
 
-def plot_scatter(ds, var_ze, var_vm):
+def plot_scatter(
+    ds: xr.Dataset, var_ze: xr.Dataset, var_vm: xr.Dataset
+) -> plt.Figure:
     """
     Scatter plot between satellite data and suborbital data.
 
@@ -31,8 +33,8 @@ def plot_scatter(ds, var_ze, var_vm):
     """
 
     # resample suborbital data
-    da_ze_res = resample(ds, variable="ze")
-    da_vm_res = resample(ds, variable="vm")
+    da_ze_res = _resample(ds, variable="ze")
+    da_vm_res = _resample(ds, variable="vm")
 
     # create plot
     fig, (ax1, ax2) = plt.subplots(
@@ -113,7 +115,7 @@ def plot_scatter(ds, var_ze, var_vm):
     return fig
 
 
-def resample(ds, variable):
+def _resample(ds, variable: str) -> xr.DataArray:
     """
     Resampling from high-resolution grid to low-resolution grid
     """
@@ -124,20 +126,20 @@ def resample(ds, variable):
     )
 
     # calculate bin edges of satellite grid
-    range_resolution = ds["height_sat"][1] - ds["height_sat"][0]
-    along_track_resolution = (
-        ds["along_track_sat"][1] - ds["along_track_sat"][0]
-    )
+    # range_resolution = ds["height_sat"][1] - ds["height_sat"][0]
+    # along_track_resolution = (
+    #     ds["along_track_sat"][1] - ds["along_track_sat"][0]
+    # )
 
-    along_track_sat_bin_edges = np.append(
-        ds["along_track_sat"] - along_track_resolution / 2,
-        ds["along_track_sat"][-1] + along_track_resolution / 2,
-    )
+    # along_track_sat_bin_edges = np.append(
+    #     ds["along_track_sat"] - along_track_resolution / 2,
+    #     ds["along_track_sat"][-1] + along_track_resolution / 2,
+    # )
 
-    range_sat_bin_edges = np.append(
-        ds["height_sat"] - range_resolution / 2,
-        ds["height_sat"][-1] + range_resolution / 2,
-    )
+    # range_sat_bin_edges = np.append(
+    #     ds["height_sat"] - range_resolution / 2,
+    #     ds["height_sat"][-1] + range_resolution / 2,
+    # )
 
     # assign satellite pixel label to each input pixel of suborbital radar
     ix_range = np.searchsorted(

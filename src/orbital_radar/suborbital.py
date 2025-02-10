@@ -67,6 +67,8 @@ class Suborbital(Simulator):
             Path to output file.
         mean_wind : float
             Mean wind speed in m/s.
+        uuid : str, optional
+            UUID of the file.
         """
 
         radar = Radar(categorize_filepath)

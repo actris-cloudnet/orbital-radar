@@ -2,18 +2,20 @@
 Reads weighting function from EarthCARE CPR.
 """
 
+from pathlib import Path
+
 import numpy as np
 import xarray as xr
 
 
-def read_range_weighting_function(file):
+def read_range_weighting_function(file: Path) -> xr.Dataset:
     """
     Reads EarthCARE CPR range weighting function. The pulse length factor
     is reversed to match the sign convention of the groundbased radar.
 
     Parameters
     ----------
-    file : str
+    file : Path
         Path to file containing weighting function
 
     Returns

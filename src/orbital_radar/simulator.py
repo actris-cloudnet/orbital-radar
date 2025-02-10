@@ -70,7 +70,7 @@ class Simulator:
             **self.radar_specs,
         )
 
-    def transform(self, ds: xr.Dataset):
+    def transform(self, ds: xr.Dataset) -> None:
         """
         Runs the entire simulator.
 
@@ -114,7 +114,7 @@ class Simulator:
         self._calculate_signal_fraction()
         self._add_attributes()
 
-    def _check_input_dataset(self):
+    def _check_input_dataset(self) -> None:
         """
         Check user input for consistency.
         """
@@ -150,7 +150,7 @@ class Simulator:
             f"{self.ds['height'].diff('height')[0]} m"
         )
 
-    def _prepare_input_dataset(self):
+    def _prepare_input_dataset(self) -> None:
         """
         Prepares input dataset for computations. This only includes replacing
         nan values by zero in both ze and vm.
@@ -164,7 +164,7 @@ class Simulator:
         # make sure that vm has no nan values
         assert not self.ds["vm"].isnull().any()
 
-    def calculate_along_track_sat_bin_edges(self):
+    def calculate_along_track_sat_bin_edges(self) -> np.ndarray:
         """
         Calculate the bin edges of the along-track satellite grid. This way
         is equivalent to height.
@@ -179,7 +179,7 @@ class Simulator:
 
         return along_track_sat_bin_edges
 
-    def calculate_height_sat_bin_edges(self):
+    def calculate_height_sat_bin_edges(self) -> np.ndarray:
         """
         Calculate the bin edges of the height satellite grid. This way is
         equivalent to along-track.
@@ -192,7 +192,7 @@ class Simulator:
 
         return height_sat_bin_edges
 
-    def _convolve_along_track(self):
+    def _convolve_along_track(self) -> None:
         """
         Calculates the along-track convolution from the input suborbital data
         using the along-track weighting function of the spaceborne radar.
@@ -222,7 +222,7 @@ class Simulator:
         self.ds["vm_acon"] = ds["vm"].dot(weight).compute()
         self.ds["vm_acon_err"] = ds["vm_err"].dot(weight).compute()
 
-    def _integrate_along_track(self):
+    def _integrate_along_track(self) -> None:
         """
         Integrates the along-track convoluted data to profiles, which represent
         the satellite's footprint. The along-track integration is given by the
@@ -261,7 +261,7 @@ class Simulator:
         # rename along-track dimension
         self.ds = self.ds.rename({"along_track_bins": "along_track_sat"})
 
-    def _convolve_height(self):
+    def _convolve_height(self) -> None:
         """
         Convolution of the along-track integrated data with the range
         weighting function of the spaceborne radar.
@@ -321,7 +321,7 @@ class Simulator:
             denominator_vm_sat_vel != 0, 0
         )
 
-    def _calculate_nubf(self):
+    def _calculate_nubf(self) -> None:
         r"""
         Calculates the non-uniform beam filling from the standard
         deviation of Ze within the radar volume.
@@ -398,7 +398,7 @@ class Simulator:
 
         self.ds["nubf_flag"] = (self.ds["nubf"] > threshold).astype("int")
 
-    def _calculate_vm_bias(self):
+    def _calculate_vm_bias(self) -> None:
         """
         Calculate the satellite Doppler velocity bias between the estimate
         with and without satellite motion error.
@@ -423,7 +423,7 @@ class Simulator:
             np.abs(self.ds["vm_bias"]) > threshold
         ).astype("int")
 
-    def _calculate_signal_fraction(self):
+    def _calculate_signal_fraction(self) -> None:
         """
         Calculates the fraction of bins that contain a ze signal above the
         detection limit of the spaceborne radar. The fraction is 1 if all
@@ -457,7 +457,7 @@ class Simulator:
             .mean()
         ).rename({"height_bins": "height_sat"})
 
-    def _calculate_ms_flag(self):
+    def _calculate_ms_flag(self) -> None:
         """
         Calculates the multiple scattering flag. The flag is 1 if multiple
         scattering occurs, and 0 if no multiple scattering occurs.
@@ -539,7 +539,7 @@ class Simulator:
 
         return x_noise
 
-    def calculate_vm_std_nubf(self):
+    def calculate_vm_std_nubf(self) -> xr.DataArray:
         """
         Calculate outstanding error in correcting Mean Doppler Velocity biases
         caused by non-uniform beam filling
@@ -612,7 +612,7 @@ class Simulator:
 
         return vm_std
 
-    def _calculate_ze_noise(self):
+    def _calculate_ze_noise(self) -> None:
         """
         Adds noise to satellite radar reflectivity based on the pre-defined
         lookup table with noise values for different radar reflectivity bins.
@@ -652,7 +652,7 @@ class Simulator:
             )
         )
 
-    def _calculate_vm_noise(self):
+    def _calculate_vm_noise(self) -> None:
         """
         Adds noise to satellite Doppler velocity based on the pre-defined
         lookup table with noise values for different radar reflectivity bins.
@@ -702,7 +702,7 @@ class Simulator:
             x=self.ds["vm_sat_vel"], x_std=vm_std, noise=noise
         )
 
-    def _fold_vm(self):
+    def _fold_vm(self) -> None:
         """
         Doppler velocity folding correction.
         """
@@ -766,7 +766,7 @@ class Simulator:
             f'{self.ds["vm_sat_folded"].max()}'
         )
 
-    def _add_attributes(self):
+    def _add_attributes(self) -> None:
         """
         Adds attributes to the variables of the dataset
         """
