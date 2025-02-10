@@ -170,6 +170,7 @@ class Suborbital(Simulator):
                 f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S +00:00} - {file_type} file created\n"
                 + nc.history
             )
+            nc.references = "https://doi.org/10.5194/gmd-18-101-2025"
 
         return uuid
 
