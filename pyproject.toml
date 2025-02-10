@@ -43,7 +43,7 @@ check_untyped_defs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["matplotlib.*", "netCDF4.*", "scipy.*", "skimage.*", "pandas.*"]
+module = ["netCDF4.*", "scipy.*", "skimage.*", "pandas.*"]
 ignore_missing_imports = true
 
 [tool.release-version]
