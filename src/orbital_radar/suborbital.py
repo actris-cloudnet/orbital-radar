@@ -152,10 +152,6 @@ class Suborbital(Simulator):
             for attr in (
                 "cloudnetpy_version",
                 "pid",
-                "location",
-                "title",
-                "references",
-                "source",
             ):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
