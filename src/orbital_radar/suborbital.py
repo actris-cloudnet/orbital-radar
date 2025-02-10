@@ -546,7 +546,10 @@ class Suborbital(Simulator):
         }
 
         self.ds[variable_map.keys()].to_netcdf(  # type: ignore
-            output_filepath, mode="w", encoding=variable_map
+            output_filepath,
+            mode="w",
+            encoding=variable_map,
+            format="NETCDF4_CLASSIC",
         )
         logging.debug(f"Written file: {output_filepath}")
 
