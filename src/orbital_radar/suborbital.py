@@ -13,8 +13,8 @@ import numpy as np
 import xarray as xr
 
 from orbital_radar.helpers import db2li, li2db, remove_duplicate_times
+from orbital_radar.radar import Radar
 from orbital_radar.radarspec import RadarBeam
-from orbital_radar.readers.radar import Radar
 from orbital_radar.simulator import Simulator
 from orbital_radar.version import __version__
 

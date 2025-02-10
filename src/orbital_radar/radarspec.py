@@ -68,8 +68,7 @@ from typing import List, Union
 import numpy as np
 from scipy.constants import c as SPEED_OF_LIGHT
 
-from orbital_radar.helpers import db2li
-from orbital_radar.readers.rangewf import read_range_weighting_function
+from orbital_radar.helpers import db2li, read_range_weighting_function
 
 RADARS_PREDEFINED = {
     "earthcare": {
