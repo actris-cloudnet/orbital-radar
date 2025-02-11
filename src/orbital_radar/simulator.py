@@ -718,13 +718,11 @@ class Simulator:
         self.ds["ze"].attrs = {
             "long_name": "Radar reflectivity factor of input",
             "units": "mm6 m-3",
-            "description": "Radar reflectivity factor of input",
         }
 
         self.ds["vm"].attrs = {
             "long_name": "Mean Doppler velocity of input",
             "units": "m s-1",
-            "description": "Mean Doppler velocity of input",
         }
 
         # add attributes to dimensions
@@ -761,21 +759,20 @@ class Simulator:
         self.ds["nubf_flag"].attrs = {
             "long_name": "Non-uniform beam filling flag",
             "units": "1",
-            "description": "Non-uniform beam filling flag. 1 means "
-            "non-uniform beam filling is higher than 1 dB, 0 means "
-            "non-uniform beam filling is lower than 1 dB.",
+            "description": "1 means non-uniform beam filling is higher "
+            "than 1 dB, 0 means non-uniform beam filling is lower than 1 dB.",
         }
 
         self.ds["signal_fraction"].attrs = {
             "long_name": "Fraction of bins that contain signal",
-            "description": "Fraction of bins that contain signal. 1 means all "
-            "bins contain signal, 0 means no bins contain signal.",
+            "description": "1 means all bins contain signal, "
+            "0 means no bins contain signal.",
         }
 
         self.ds["ms_flag"].attrs = {
             "long_name": "Multiple scattering flag",
             "units": "1",
-            "description": "Multiple scattering flag. 1 means multiple "
+            "description": "1 means multiple "
             "scattering occurs, 0 means no multiple scattering occurs. "
             "This flag only makes sense for airborne observations. "
             "Groundbased observations likely underestimate the occurrence of "
@@ -785,7 +782,7 @@ class Simulator:
         self.ds["folding_flag"].attrs = {
             "long_name": "Folding flag",
             "units": "1",
-            "description": "Folding flag. 1 means velocity is folded, 0 means "
+            "description": "1 means velocity is folded, 0 means "
             "velocity is not folded.",
         }
 
@@ -885,7 +882,6 @@ class Simulator:
             attrs={
                 "long_name": "Satellite instantaneous field of view",
                 "units": "m",
-                "description": "Satellite instantaneous field of view",
             },
         )
 
@@ -894,7 +890,6 @@ class Simulator:
             attrs={
                 "long_name": "Satellite range resolution",
                 "units": "m",
-                "description": "Satellite range resolution",
             },
         )
 
@@ -903,6 +898,5 @@ class Simulator:
             attrs={
                 "long_name": "Satellite along-track resolution",
                 "units": "m",
-                "description": "Satellite along-track resolution",
             },
         )
