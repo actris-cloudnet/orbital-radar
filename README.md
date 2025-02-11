@@ -1,3 +1,3 @@
-# Orbital-Radar
+# orbital-radar-lite
 
-Cloudnet-specific POC of the [orbital-radar package](https://github.com/igmk/orbital-radar).
+Cloudnet-specific POC of the full [orbital-radar package](https://github.com/igmk/orbital-radar).
