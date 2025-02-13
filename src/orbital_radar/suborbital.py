@@ -90,10 +90,6 @@ class Suborbital(Simulator):
 
             self._interpolate_to_regular_grid(radar.ds)
 
-            # TODO: Check this. Cloudnet categorize
-            # is already attenuation corrected?!
-            self._apply_gas_attenuation(ds_categorize)
-
         self._add_ground_echo()
 
         # run simulator
@@ -384,31 +380,6 @@ class Suborbital(Simulator):
             format="NETCDF4_CLASSIC",
         )
         logging.debug(f"Written file: {output_filepath}")
-
-    def _apply_gas_attenuation(self, ds_categorize: xr.Dataset) -> None:
-        """
-        Gas attenuation correction based on Cloudnet categorize file.
-
-        Parameters
-        ----------
-        ds_categorize : xarray.Dataset
-            Cloudnet data with "gas_atten" variable. Unit: dBZ
-        """
-
-        # interpolate to radar height grid
-        gas_atten = ds_categorize.radar_gas_atten.interp(
-            height=self.ds.height, method="linear"
-        )
-
-        # interpolate to radar time grid and extrapolate if needed
-        gas_atten = gas_atten.interp(
-            time=self.ds.time,
-            method="linear",
-            kwargs={"fill_value": "extrapolate"},
-        )
-
-        # apply attenuation correction
-        self.ds["ze"] *= db2li(gas_atten)
 
     def _remove_duplicate_times(self) -> None:
         _, index = np.unique(self.ds["time"], return_index=True)
