@@ -40,7 +40,6 @@ class Radar:
 
         Parameters
         ----------
-        radar_filepath : str
         categorize_filepath : str
         """
 
@@ -96,10 +95,10 @@ class Radar:
         """
 
         msg = (
-            f"Correcting dielectric constant {radar_k2}"
+            f"Correcting dielectric constant {radar_k2} "
             f"to match spaceborne radar {satellite_k2}"
         )
-        logging.info(msg)
+        logging.debug(msg)
 
         correction = satellite_k2 / radar_k2
 

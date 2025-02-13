@@ -76,9 +76,6 @@ class Suborbital(Simulator):
 
             if np.isclose(frequency, 35, atol=1):
                 radar.convert_frequency()
-
-            # TODO: Check this. Maybe you want to do
-            # this every time after frequency conversion?
             elif np.isclose(frequency, 94, atol=1):
                 radar.correct_dielectric_constant(
                     satellite_k2=0.75, radar_k2=0.86
@@ -154,7 +151,9 @@ class Suborbital(Simulator):
             file_type = "cpr-simulation"
             nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
-            nc.title = f"Simulated CPR radar from {nc_source.location}"
+            nc.title = (
+                f"Synthetic EarthCARE CPR cloud radar from {nc.location}"
+            )
             nc.source = nc_source.variables["Z"].source
             nc.source_file_uuids = nc_source.file_uuid
             now = f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S +00:00}"
