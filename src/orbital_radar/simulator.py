@@ -821,14 +821,14 @@ class Simulator:
         self.ds["ze_sat"].attrs = {
             "long_name": "Convolved and integrated radar reflectivity factor",
             "units": "mm6 m-3",
-            "description": "Convolved and integrated radar reflectivity factor"
+            "description": "Convolved and integrated radar reflectivity factor "
             "along height and track",
         }
 
         self.ds["vm_sat"].attrs = {
             "long_name": "Convolved and integrated mean Doppler velocity",
             "units": "m s-1",
-            "description": "Convolved and integrated mean Doppler velocity"
+            "description": "Convolved and integrated mean Doppler velocity "
             "along height and track",
         }
 
