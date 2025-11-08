@@ -821,8 +821,8 @@ class Simulator:
         self.ds["ze_sat"].attrs = {
             "long_name": "Convolved and integrated radar reflectivity factor",
             "units": "mm6 m-3",
-            "description": "Convolved and integrated radar reflectivity factor "
-            "along height and track",
+            "description": "Convolved and integrated radar reflectivity "
+            "factor along height and track",
         }
 
         self.ds["vm_sat"].attrs = {
