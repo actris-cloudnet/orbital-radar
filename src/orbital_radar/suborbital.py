@@ -341,9 +341,19 @@ class Suborbital(Simulator):
         FLOAT = {
             "dtype": "float32",
             "_FillValue": netCDF4.default_fillvals["f4"],
+            "zlib": True,
+            "complevel": 4,
         }
-        INT = {"dtype": "int32", "_FillValue": netCDF4.default_fillvals["i4"]}
-        FLOAT_SCALAR = {"dtype": "float32", "_FillValue": None}
+        INT = {
+            "dtype": "int32",
+            "_FillValue": netCDF4.default_fillvals["i4"],
+            "zlib": True,
+            "complevel": 4,
+        }
+        FLOAT_SCALAR = {
+            "dtype": "float32",
+            "_FillValue": None,
+        }
 
         variable_map = {
             "time": TIME,
