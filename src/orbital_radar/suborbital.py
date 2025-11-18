@@ -337,6 +337,8 @@ class Suborbital(Simulator):
             "dtype": "float64",
             "_FillValue": None,
             "units": f"hours since {date} 00:00:00 +00:00",
+            "zlib": True,
+            "complevel": 4,
         }
         FLOAT = {
             "dtype": "float32",
