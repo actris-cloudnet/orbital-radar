@@ -17,7 +17,7 @@ import logging
 import numpy as np
 import xarray as xr
 
-from orbital_radar.helpers import db2li
+from orbital_radar.helpers import db2li, li2db
 
 
 class Radar:
@@ -65,8 +65,8 @@ class Radar:
 
         a = -16.8251
         b = 8.4923
-        self.ds["ze"] = self.ds["ze"] * 10 ** (
-            -(10**a) * (np.log10(self.ds["ze"]) + 100) ** b
+        self.ds["ze"] = db2li(
+            li2db(self.ds["ze"]) - 10**a * (li2db(self.ds["ze"]) + 100) ** b
         )
 
         # set negative ze to zero
