@@ -177,8 +177,8 @@ class Simulator:
         # the last radar bin is created only if it is included in the input
         # grid. the same convention is applied to the height grid
         along_track_sat_edges: np.ndarray = np.arange(
-            self.ds["along_track"][0],
-            self.ds["along_track"][-1],
+            self.ds["along_track"][0].item(),
+            self.ds["along_track"][-1].item(),
             self.beam.spec.along_track_resolution,
         )
 
