@@ -148,6 +148,15 @@ class Suborbital(Simulator):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
 
+            # Add source instrument pid to proper variables
+            source_pid = getattr(
+                nc_source.variables["Z"], "source_instrument_pid", None
+            )
+            if source_pid is not None:
+                for var in nc.variables:
+                    if "ze" in var or "vm" in var:
+                        nc.variables[var].source_instrument_pid = source_pid
+
             file_type = "cpr-simulation"
             nc.cloudnet_file_type = file_type
             nc.location = nc_source.location
