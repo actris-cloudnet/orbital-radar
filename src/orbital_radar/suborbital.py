@@ -288,7 +288,9 @@ class Suborbital(Simulator):
         # add ground echo to dataset shifted by one height bin to have maximum
         # below zero
         # get closest height bin to ground
-        idx = (np.abs(self.ds.height - np.mean(self.ds.altitude))).argmin()
+        idx = (np.abs(self.ds.height - np.mean(self.ds.altitude))).argmin(
+            dim="height"
+        )
         base = self.ds.height[idx].item()
 
         # insert half of the calculated ground echo and shift maximum below the
