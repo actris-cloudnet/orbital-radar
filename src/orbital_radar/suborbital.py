@@ -148,7 +148,10 @@ class Suborbital(Simulator):
                 if attr in nc.ncattrs():
                     nc.delncattr(attr)
 
-            # Add source instrument pid to proper variables
+            # Add source instrument pid to proper variables and override the
+            # global source_instrument_pids (which is inherited from the
+            # categorize file and lists every contributing instrument) so it
+            # contains only the radar pid.
             source_pid = getattr(
                 nc_source.variables["Z"], "source_instrument_pid", None
             )
@@ -156,6 +159,9 @@ class Suborbital(Simulator):
                 for var in nc.variables:
                     if "ze" in var or "vm" in var:
                         nc.variables[var].source_instrument_pid = source_pid
+                nc.source_instrument_pids = source_pid
+            elif "source_instrument_pids" in nc.ncattrs():
+                nc.delncattr("source_instrument_pids")
 
             file_type = "cpr-simulation"
             nc.cloudnet_file_type = file_type
